@@ -46,7 +46,7 @@
 #include <locale.h>
 #endif
 
-const char *VER= "15.1";
+const char *VER= "15.2";
 
 /* Don't try to make a nice table if the data is too big */
 #define MAX_COLUMN_LENGTH	     1024
@@ -246,7 +246,7 @@ static my_bool ignore_errors=0,wait_flag=0,quick=0,
 	       tty_password= 0, opt_nobeep=0, opt_reconnect=1,
 	       opt_secure_auth= 0,
                default_pager_set= 0, opt_sigint_ignore= 0,
-               auto_vertical_output= 0,
+               auto_vertical_output= 0, show_query_cost= 0,
                show_warnings= 0, executing_query= 0,
                ignore_spaces= 0, opt_binhex= 0, opt_progress_reports;
 static my_bool debug_info_flag, debug_check_flag, batch_abort_on_error;
@@ -324,6 +324,7 @@ static int com_quit(String *str,char*),
            com_notee(String *str, char*), com_charset(String *str,char*),
            com_prompt(String *str, char*), com_delimiter(String *str, char*),
      com_warnings(String *str, char*), com_nowarnings(String *str, char*);
+static int com_query_cost(String *str, char*);
 
 #ifdef USE_POPEN
 static int com_nopager(String *str, char*), com_pager(String *str, char*),
@@ -395,6 +396,8 @@ static COMMANDS commands[] = {
   { "print",  'p', com_print,  0, "Print current command." },
   { "prompt", 'R', com_prompt, 1, "Change your mysql prompt."},
   { "quit",   'q', com_quit,   0, "Quit mysql." },
+  { "costs",  'Q', com_query_cost,  0,
+    "Toggle showing query costs after each query" },
   { "rehash", '#', com_rehash, 0, "Rebuild completion hash." },
   { "source", '.', com_source, 1,
     "Execute an SQL script file. Takes a file name as an argument."},
@@ -1156,6 +1159,7 @@ static void print_table_data_xml(MYSQL_RES *result);
 static void print_tab_data(MYSQL_RES *result);
 static void print_table_data_vertically(MYSQL_RES *result);
 static void print_warnings(void);
+static void print_last_query_cost(void);
 static void end_timer(ulonglong start_time, char *buff);
 static void nice_time(double sec,char *buff,bool part_second);
 extern "C" sig_handler mysql_end(int sig) __attribute__ ((noreturn));
@@ -1337,26 +1341,38 @@ int main(int argc,char *argv[])
   initialize_readline();
   if (!status.batch && !quick && !opt_html && !opt_xml)
   {
-    /* read-history from file, default ~/.mysql_history*/
-    if (getenv("MYSQL_HISTFILE"))
-      histfile=my_strdup(PSI_NOT_INSTRUMENTED, getenv("MYSQL_HISTFILE"),MYF(MY_WME));
-    else if (getenv("HOME"))
+    const char *home;
+    /* read-history from file, default ~/.mariadb_history*/
+    if ((histfile= getenv("MARIADB_HISTFILE"))
+        || (histfile= getenv("MYSQL_HISTFILE")))
+      histfile=my_strdup(PSI_NOT_INSTRUMENTED, histfile, MYF(MY_WME));
+    else if ((home= getenv("HOME")))
     {
       histfile=(char*) my_malloc(PSI_NOT_INSTRUMENTED,
-            strlen(getenv("HOME")) + strlen("/.mysql_history")+2, MYF(MY_WME));
+            strlen(home) + strlen("/.mariadb_history")+2, MYF(MY_WME));
       if (histfile)
-	sprintf(histfile,"%s/.mysql_history",getenv("HOME"));
-      char link_name[FN_REFLEN];
-      if (my_readlink(link_name, histfile, 0) == 0 &&
-          strncmp(link_name, "/dev/null", 10) == 0)
       {
-        /* The .mysql_history file is a symlink to /dev/null, don't use it */
-        my_free(histfile);
-        histfile= 0;
+        sprintf(histfile,"%s/.mariadb_history", home);
+        if (my_access(histfile, F_OK))
+        {
+          /* no .mariadb_history, look for historical name and use if present */
+          sprintf(histfile,"%s/.mysql_history", home);
+          /* and go back to original if not found */
+          if (my_access(histfile, F_OK))
+            sprintf(histfile,"%s/.mariadb_history", home);
+        }
+        char link_name[FN_REFLEN];
+        if (my_readlink(link_name, histfile, 0) == 0 &&
+            strncmp(link_name, "/dev/null", 10) == 0)
+        {
+          /* The .mariadb_history file is a symlink to /dev/null, don't use it */
+          my_free(histfile);
+          histfile= 0;
+        }
       }
     }
 
-    /* We used to suggest setting MYSQL_HISTFILE=/dev/null. */
+    /* We used to suggest setting MARIADB_HISTFILE=/dev/null. */
     if (histfile && strncmp(histfile, "/dev/null", 10) == 0)
       histfile= NULL;
 
@@ -1816,6 +1832,10 @@ static struct my_option my_long_options[] =
   {"show-warnings", OPT_SHOW_WARNINGS, "Show warnings after every statement.",
     &show_warnings, &show_warnings, 0, GET_BOOL, NO_ARG,
     0, 0, 0, 0, 0, 0},
+  {"show-query-costs", OPT_SHOW_WARNINGS,
+   "Show query cost after every statement.",
+    &show_query_cost, &show_query_cost, 0, GET_BOOL, NO_ARG,
+    0, 0, 0, 0, 0, 0},
   {"plugin_dir", OPT_PLUGIN_DIR, "Directory for client-side plugins.",
     &opt_plugin_dir, &opt_plugin_dir, 0,
    GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
@@ -1850,12 +1870,12 @@ static void usage(int version)
 #else
   const char* readline= "readline";
 #endif
-  printf("%s  Ver %s Distrib %s, for %s (%s) using %s %s\n",
-	 my_progname, VER, MYSQL_SERVER_VERSION, SYSTEM_TYPE, MACHINE_TYPE,
+  printf("%s from %s, client %s for %s (%s) using %s %s\n",
+	 my_progname, MYSQL_SERVER_VERSION, VER, SYSTEM_TYPE, MACHINE_TYPE,
          readline, rl_library_version);
 #else
-  printf("%s  Ver %s Distrib %s, for %s (%s), source revision %s\n", my_progname, VER,
-	MYSQL_SERVER_VERSION, SYSTEM_TYPE, MACHINE_TYPE,SOURCE_REVISION);
+  printf("%s from %s, client %s for %s (%s), source revision %s\n", my_progname,
+	MYSQL_SERVER_VERSION, VER, SYSTEM_TYPE, MACHINE_TYPE,SOURCE_REVISION);
 #endif
 
   if (version)
@@ -3574,6 +3594,8 @@ end:
  /* Show warnings if any or error occurred */
   if (show_warnings == 1 && (warnings >= 1 || error))
     print_warnings();
+  if (show_query_cost)
+    print_last_query_cost();
 
   if (!error && !status.batch && 
       (mysql.server_status & SERVER_STATUS_DB_DROPPED))
@@ -3798,7 +3820,10 @@ print_table_data(MYSQL_RES *result)
   {
     print_field_types(result);
     if (!mysql_num_rows(result))
+    {
+      my_afree((uchar*) num_flag);
       return;
+    }
     mysql_field_seek(result,0);
   }
   separator.copy("+",1,charset_info);
@@ -4172,6 +4197,33 @@ static void print_warnings()
     tee_fprintf(PAGER, "%s (Code %s): %s\n", cur[0], cur[1], cur[2]);
   } while ((cur= mysql_fetch_row(result)));
   end_pager();
+
+end:
+  mysql_free_result(result);
+}
+
+
+/* print_last_query_cost */
+
+static void print_last_query_cost()
+{
+  const char   *query;
+  char *end;
+  MYSQL_RES    *result;
+  MYSQL_ROW    cur;
+
+  query= "show status like 'last_query_cost'";
+  mysql_real_query_for_lazy(query, strlen(query));
+  mysql_store_result_for_lazy(&result);
+  if (!result)
+    goto end;
+
+  cur= mysql_fetch_row(result);
+  if (strtod(cur[1], &end) != 0.0)
+  {
+    init_pager();
+    tee_fprintf(PAGER, "%s: %s\n\n", cur[0], cur[1]);
+  }
 
 end:
   mysql_free_result(result);
@@ -4753,6 +4805,18 @@ com_nowarnings(String *buffer __attribute__((unused)),
   return 0;
 }
 
+static int
+com_query_cost(String *buffer __attribute__((unused)),
+               char *line __attribute__((unused)))
+{
+  show_query_cost= 1 - show_query_cost;
+  if (show_query_cost)
+    put_info("Last_query_cost enabled.",INFO_INFO);
+  else
+    put_info("Last_query_cost disabled.",INFO_INFO);
+  return 0;
+}
+
 /*
   Gets argument from a command on the command line. If mode is not GET_NEXT,
   skips the command and returns the first argument. The line is modified by
@@ -5008,6 +5072,10 @@ com_status(String *buffer __attribute__((unused)),
   ulonglong id;
   MYSQL_RES *UNINIT_VAR(result);
 
+  /*
+    Don't remove "limit 1",
+    it is protection against SQL_SELECT_LIMIT=0
+  */
   if (mysql_real_query_for_lazy(
         C_STRING_WITH_LEN("select DATABASE(), USER() limit 1")))
     return 0;
@@ -5015,10 +5083,6 @@ com_status(String *buffer __attribute__((unused)),
   tee_puts("--------------", stdout);
   usage(1);					/* Print version */
   tee_fprintf(stdout, "\nConnection id:\t\t%lu\n",mysql_thread_id(&mysql));
-  /*
-    Don't remove "limit 1",
-    it is protection against SQL_SELECT_LIMIT=0
-  */
   if (!mysql_store_result_for_lazy(&result))
   {
     MYSQL_ROW cur=mysql_fetch_row(result);

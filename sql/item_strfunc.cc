@@ -1830,7 +1830,7 @@ bool Item_func_lcase::fix_length_and_dec(THD *thd)
   if (agg_arg_charsets_for_string_result(collation, args, 1))
     return TRUE;
   DBUG_ASSERT(collation.collation != NULL);
-  multiply= collation.collation->casedn_multiply;
+  multiply= collation.collation->casedn_multiply();
   converter= collation.collation->cset->casedn;
   fix_char_length_ulonglong((ulonglong) args[0]->max_char_length() * multiply);
   return FALSE;
@@ -1841,10 +1841,22 @@ bool Item_func_ucase::fix_length_and_dec(THD *thd)
   if (agg_arg_charsets_for_string_result(collation, args, 1))
     return TRUE;
   DBUG_ASSERT(collation.collation != NULL);
-  multiply= collation.collation->caseup_multiply;
+  multiply= collation.collation->caseup_multiply();
   converter= collation.collation->cset->caseup;
   fix_char_length_ulonglong((ulonglong) args[0]->max_char_length() * multiply);
   return FALSE;
+}
+
+
+bool Item_func_left::hash_not_null(Hasher *hasher)
+{
+  StringBuffer<STRING_BUFFER_USUAL_SIZE> buf;
+  String *str= val_str(&buf);
+  DBUG_ASSERT((str == NULL) == null_value);
+  if (!str)
+    return true;
+  hasher->add(collation.collation, str->ptr(), str->length());
+  return false;
 }
 
 

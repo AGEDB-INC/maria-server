@@ -310,7 +310,8 @@ bool wsrep_sst_donor_update (sys_var *self, THD* thd, enum_var_type type)
 
 bool wsrep_before_SE()
 {
-  return (wsrep_provider != NULL
+  return (wsrep_provider
+          && *wsrep_provider
           && strcmp (wsrep_provider,   WSREP_NONE)
           && strcmp (wsrep_sst_method, WSREP_SST_SKIP)
           && strcmp (wsrep_sst_method, WSREP_SST_MYSQLDUMP));
@@ -336,9 +337,14 @@ static bool wsrep_sst_complete (THD*                thd,
   if ((state == Wsrep_server_state::s_joiner ||
        state == Wsrep_server_state::s_initialized))
   {
-    Wsrep_server_state::instance().sst_received(client_service,
-       rcode);
-    WSREP_INFO("SST succeeded for position %s", start_pos_buf);
+    if (Wsrep_server_state::instance().sst_received(client_service, rcode))
+    {
+      failed= true;
+    }
+    else
+    {
+      WSREP_INFO("SST succeeded for position %s", start_pos_buf);
+    }
   }
   else
   {

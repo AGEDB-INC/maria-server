@@ -1420,7 +1420,7 @@ public:
     : m_ot_ctx(ot_ctx_arg), m_is_active(FALSE)
   {}
 
-  virtual ~MDL_deadlock_handler() {}
+  virtual ~MDL_deadlock_handler() = default;
 
   virtual bool handle_condition(THD *thd,
                                 uint sql_errno,
@@ -4757,6 +4757,7 @@ restart:
         tbl->reginfo.lock_type= tables->lock_type;
       tbl->reginfo.skip_locked= tables->skip_locked;
     }
+
 #ifdef WITH_WSREP
     /*
        At this point we have SE associated with table so we can check wsrep_mode

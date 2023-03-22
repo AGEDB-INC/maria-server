@@ -51,6 +51,10 @@ SET tx_read_only=1;
 BEGIN;
 INSERT INTO t2 VALUES(0);
 INSERT INTO t VALUES(0);
+ROLLBACK;
+BEGIN;
+INSERT INTO t2 VALUES(0);
+INSERT INTO t VALUES(0);
 COMMIT;
 INSERT INTO t VALUES(0);
 
@@ -231,6 +235,20 @@ SELECT TABLE_ROWS, AVG_ROW_LENGTH>0 FROM INFORMATION_SCHEMA.TABLES
 WHERE TABLE_NAME='t1' AND TABLE_SCHEMA='test';
 DROP TABLE t1;
 
+--echo #
+--echo # MDEV-29975 InnoDB fails to release savepoint during bulk insert
+--echo #
+CREATE TABLE t (c INT KEY) ENGINE=InnoDB;
+begin;
+--error ER_WRONG_VALUE_COUNT_ON_ROW
+INSERT INTO t VALUES (0,0);
+SAVEPOINT a;
+--error ER_ERROR_DURING_COMMIT
+INSERT INTO t VALUES (0),(0);
+SAVEPOINT a;
+commit;
+SELECT * FROM t;
+DROP TABLE t;
 --echo # End of 10.6 tests
 
 --echo #
@@ -420,3 +438,22 @@ SELECT COUNT(*) AS nb_corrupted_rows FROM t1 WHERE data != REPEAT('X', @@innodb_
 DROP TABLE t1;
 
 --echo # End of 10.7 tests
+
+--echo #
+--echo #  MDEV-30426  Assertion !rec_offs_nth_extern(offsets2, n)
+--echo #	during bulk insert
+--echo #
+CREATE TABLE t1(f1 TEXT NOT NULL, f2 TEXT NOT NULL,
+		f3 TEXT NOT NULL, f4 TEXT NOT NULL,
+		f5 TEXT NOT NULL, f6 TEXT NOT NULL,
+		PRIMARY KEY(f6(10)))ENGINE=InnoDB;
+BEGIN;
+--error ER_ERROR_DURING_COMMIT
+INSERT INTO t1 VALUES
+        (repeat('a', 200), repeat('b', 200), repeat('c', 200),
+         repeat('d', 200), repeat('e', 200), repeat('f', 200)),
+        (repeat('b', 20000), repeat('c', 16000), repeat('d', 12000),
+         repeat('e', 12000), repeat('f', 12000), repeat('f', 12000));
+COMMIT;
+DROP TABLE t1;
+--echo # End of 10.8 tests

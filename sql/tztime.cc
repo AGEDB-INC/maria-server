@@ -29,6 +29,7 @@
 #pragma implementation				// gcc: Class implementation
 #endif
 
+#define VER "1.1"
 #include "mariadb.h"
 #if !defined(TZINFO2SQL) && !defined(TESTTIME)
 #include "sql_priv.h"
@@ -43,6 +44,7 @@
 #include <my_getopt.h>
 #endif
 
+#include <welcome_copyright_notice.h>
 #include "tztime.h"
 #include "tzfile.h"
 #include <m_string.h>
@@ -63,8 +65,6 @@
 #define ABBR_ARE_USED
 #endif /* !defined(DBUG_OFF) */
 #endif /* defined(TZINFO2SQL) || defined(TESTTIME) */
-
-#define PROGRAM_VERSION "1.1"
 
 /* Structure describing local time type (e.g. Moscow summer time (MSD)) */
 typedef struct ttinfo
@@ -1027,7 +1027,7 @@ static const String tz_SYSTEM_name("SYSTEM", 6, &my_charset_latin1);
 class Time_zone_system : public Time_zone
 {
 public:
-  Time_zone_system() {}                       /* Remove gcc warning */
+  Time_zone_system() = default;                       /* Remove gcc warning */
   virtual my_time_t TIME_to_gmt_sec(const MYSQL_TIME *t, uint *error_code) const;
   virtual void gmt_sec_to_TIME(MYSQL_TIME *tmp, my_time_t t) const;
   virtual const String * get_name() const;
@@ -1123,7 +1123,7 @@ Time_zone_system::get_name() const
 class Time_zone_utc : public Time_zone
 {
 public:
-  Time_zone_utc() {}                          /* Remove gcc warning */
+  Time_zone_utc() = default;                          /* Remove gcc warning */
   virtual my_time_t TIME_to_gmt_sec(const MYSQL_TIME *t,
                                     uint *error_code) const;
   virtual void gmt_sec_to_TIME(MYSQL_TIME *tmp, my_time_t t) const;
@@ -1623,6 +1623,8 @@ my_tz_init(THD *org_thd, const char *default_tzname, my_bool bootstrap)
     DBUG_RETURN(1);
   thd->thread_stack= (char*) &thd;
   thd->store_globals();
+  thd->set_query_inner((char*) STRING_WITH_LEN("intern:my_tz_init"),
+                       default_charset_info);
 
   /* Init all memory structures that require explicit destruction */
   if (my_hash_init(key_memory_tz_storage, &tz_names, &my_charset_latin1, 20, 0,
@@ -2665,12 +2667,6 @@ C_MODE_START
 static my_bool get_one_option(const struct my_option *, const char *,
                               const char *);
 C_MODE_END
-
-static void print_version(void)
-{
-  printf("%s  Ver %s Distrib %s, for %s (%s)\n",my_progname, PROGRAM_VERSION,
-	 MYSQL_SERVER_VERSION,SYSTEM_TYPE,MACHINE_TYPE);
-}
 
 static const char *default_timezone_dir= "/usr/share/zoneinfo/";
 

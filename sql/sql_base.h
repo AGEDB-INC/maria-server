@@ -357,7 +357,7 @@ inline void setup_table_map(TABLE *table, TABLE_LIST *table_list, uint tablenr)
   }
   table->tablenr= tablenr;
   table->map= (table_map) 1 << tablenr;
-  table->force_index= table_list->force_index;
+  table->force_index= table->force_index_join= 0;
   table->force_index_order= table->force_index_group= 0;
   table->covering_keys= table->s->keys_for_keyread;
 }
@@ -395,7 +395,7 @@ inline bool setup_fields_with_no_wrap(THD *thd, Ref_ptr_array ref_pointer_array,
 class Prelocking_strategy
 {
 public:
-  virtual ~Prelocking_strategy() { }
+  virtual ~Prelocking_strategy() = default;
 
   virtual void reset(THD *thd) { };
   virtual bool handle_routine(THD *thd, Query_tables_list *prelocking_ctx,

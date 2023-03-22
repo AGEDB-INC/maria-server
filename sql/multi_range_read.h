@@ -204,7 +204,7 @@ class Mrr_reader
 public:
   virtual int get_next(range_id_t *range_info) = 0;
   virtual int refill_buffer(bool initial) = 0;
-  virtual ~Mrr_reader() {}; /* just to remove compiler warning */
+  virtual ~Mrr_reader() = default; /* just to remove compiler warning */
 };
 
 
@@ -576,7 +576,7 @@ public:
 
   ha_rows dsmrr_info_const(uint keyno, RANGE_SEQ_IF *seq, 
                             void *seq_init_param, uint n_ranges, uint *bufsz,
-                            uint *flags, Cost_estimate *cost);
+                           uint *flags, ha_rows limit, Cost_estimate *cost);
 
   int dsmrr_explain_info(uint mrr_mode, char *str, size_t size);
 private:

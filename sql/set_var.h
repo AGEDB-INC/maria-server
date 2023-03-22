@@ -84,7 +84,7 @@ protected:
   typedef bool (*on_update_function)(sys_var *self, THD *thd, enum_var_type type);
 
   int flags;            ///< or'ed flag_enum values
-  const SHOW_TYPE show_val_type; ///< what value_ptr() returns for sql_show.cc
+  SHOW_TYPE show_val_type; ///< what value_ptr() returns for sql_show.cc
   PolyLock *guard;      ///< *second* lock that protects the variable
   ptrdiff_t offset;     ///< offset to the value from global_system_variables
   on_check_function on_check;
@@ -99,7 +99,7 @@ public:
           on_check_function on_check_func, on_update_function on_update_func,
           const char *substitute);
 
-  virtual ~sys_var() {}
+  virtual ~sys_var() = default;
 
   /**
     All the cleanup procedures should be performed here
@@ -134,6 +134,8 @@ public:
     return system_charset_info;
   }
   bool is_readonly() const { return flags & READONLY; }
+  void update_flags(int new_flags) { flags = new_flags; }
+  int get_flags() const { return flags; }
   /**
     the following is only true for keycache variables,
     that support the syntax @@keycache_name.variable_name
@@ -278,8 +280,8 @@ protected:
 class set_var_base :public Sql_alloc
 {
 public:
-  set_var_base() {}
-  virtual ~set_var_base() {}
+  set_var_base() = default;
+  virtual ~set_var_base() = default;
   virtual int check(THD *thd)=0;           /* To check privileges etc. */
   virtual int update(THD *thd)=0;                  /* To set the value */
   virtual int light_check(THD *thd) { return check(thd); }   /* for PS */
@@ -485,5 +487,4 @@ void free_engine_list(plugin_ref *list);
 plugin_ref *copy_engine_list(plugin_ref *list);
 plugin_ref *temp_copy_engine_list(THD *thd, plugin_ref *list);
 char *pretty_print_engine_list(THD *thd, plugin_ref *list);
-
 #endif

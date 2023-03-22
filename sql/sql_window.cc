@@ -423,6 +423,16 @@ ORDER *st_select_lex::find_common_window_func_partition_fields(THD *thd)
 #define CMP_GT_C       1    // Greater than and compatible
 #define CMP_GT         2    // Greater then
 
+
+/*
+  This function is used for sorting ORDER/PARTITION BY clauses of window
+  functions and so must implement an order relation on ORDER BY clauses"
+
+  It is called by a sorting function.
+  The function return's CMP_EQ (=0) if the values are identical.
+  If not equal, it returns a stable value < or > than 0.
+*/
+
 static
 int compare_order_elements(ORDER *ord1, int weight1,
                            ORDER *ord2, int weight2)
@@ -944,7 +954,7 @@ protected:
 class Table_read_cursor : public Rowid_seq_cursor
 {
 public:
-  virtual ~Table_read_cursor() {}
+  virtual ~Table_read_cursor() = default;
 
   void init(READ_RECORD *info)
   {
@@ -1128,7 +1138,7 @@ public:
 
   virtual bool is_outside_computation_bounds() const { return false; };
 
-  virtual ~Frame_cursor() {}
+  virtual ~Frame_cursor() = default;
 
   /*
      Regular frame cursors add or remove values from the sum functions they

@@ -22,6 +22,38 @@ SET NAMES utf8 COLLATE utf8_unicode_nopad_ci;
 --echo # End of 10.2 tests
 --echo #
 
+
+--echo #
+--echo # Start of 10.3 tests
+--echo #
+
+--echo #
+--echo # MDEV-30556 UPPER() returns an empty string for U+0251 in Unicode-5.2.0+ collations for utf8
+--echo #
+
+SET NAMES utf8mb3 COLLATE utf8mb3_unicode_ci /*Unicode-4.0 folding*/;
+--source include/ctype_casefolding.inc
+
+SET NAMES utf8mb3 COLLATE utf8mb3_turkish_ci /*Unicode-4.0 folding, with Turkish mapping for I */;
+--source include/ctype_casefolding.inc
+
+SET NAMES utf8mb3 COLLATE utf8mb3_unicode_520_ci;
+--source include/ctype_casefolding.inc
+
+SET NAMES utf8mb3 COLLATE utf8mb3_unicode_520_nopad_ci;
+--source include/ctype_casefolding.inc
+
+SET NAMES utf8mb3 COLLATE utf8mb3_myanmar_ci;
+--source include/ctype_casefolding.inc
+
+SET NAMES utf8mb3 COLLATE utf8mb3_thai_520_w2;
+--source include/ctype_casefolding.inc
+
+
+--echo #
+--echo # End of 10.3 tests
+--echo #
+
 --echo #
 --echo # Start of 10.10 tests
 --echo #
@@ -47,6 +79,21 @@ SELECT f1();
 DROP FUNCTION f1;
 SET NAMES utf8mb3;
 
+--echo #
+--echo # End of 10.10 tests
+--echo #
+
+
+--echo #
+--echo # Start of 10.10 tests
+--echo #
+
+--echo #
+--echo # MDEV-30661 UPPER() returns an empty string for U+0251 in uca1400 collations for utf8
+--echo #
+
+SET NAMES utf8mb3 COLLATE utf8mb3_uca1400_ai_ci;
+--source include/ctype_casefolding.inc
 
 --echo #
 --echo # End of 10.10 tests

@@ -33,7 +33,7 @@
   And many others
 */
 
-#define MTEST_VERSION "3.5"
+#define VER "3.5"
 
 #include "client_priv.h"
 #include <mysql_version.h>
@@ -6245,7 +6245,9 @@ int do_done(struct st_command *command)
     if (*cur_block->delim) 
     {
       /* Restore "old" delimiter after false if block */
-      strcpy (delimiter, cur_block->delim);
+      if (safe_strcpy(delimiter, sizeof(delimiter), cur_block->delim))
+        die("Delimiter too long, truncated");
+
       delimiter_length= strlen(delimiter);
     }
     /* Pop block from stack, goto next line */
@@ -6500,10 +6502,12 @@ void do_block(enum block_cmd cmd, struct st_command* command)
   if (cur_block->ok) 
   {
     cur_block->delim[0]= '\0';
-  } else
+  }
+  else
   {
     /* Remember "old" delimiter if entering a false if block */
-    strcpy (cur_block->delim, delimiter);
+    if (safe_strcpy(cur_block->delim, sizeof(cur_block->delim), delimiter))
+      die("Delimiter too long, truncated");
   }
   
   DBUG_PRINT("info", ("OK: %d", cur_block->ok));
@@ -7191,12 +7195,6 @@ static struct my_option my_long_options[] =
   { 0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}
 };
 
-
-void print_version(void)
-{
-  printf("%s  Ver %s Distrib %s, for %s (%s)\n",my_progname,MTEST_VERSION,
-	 MYSQL_SERVER_VERSION,SYSTEM_TYPE,MACHINE_TYPE);
-}
 
 void usage()
 {
@@ -8613,6 +8611,7 @@ end:
 
   var_set_errno(mysql_stmt_errno(stmt));
 
+  display_optimizer_trace(cn, ds);
   revert_properties();
 
   /* Close the statement if reconnect, need new prepare */
@@ -11905,9 +11904,8 @@ static int setenv(const char *name, const char *value, int overwrite)
   char *envvar= (char *)malloc(buflen);
   if(!envvar)
     return ENOMEM;
-  strcpy(envvar, name);
-  strcat(envvar, "=");
-  strcat(envvar, value);
+
+  snprintf(envvar, buflen, "%s=%s", name, value);
   putenv(envvar);
   return 0;
 }

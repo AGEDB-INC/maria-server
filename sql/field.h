@@ -558,7 +558,6 @@ static inline const char *vcol_type_name(enum_vcol_info_type type)
 #define VCOL_AUTO_INC         16
 #define VCOL_IMPOSSIBLE       32
 #define VCOL_NEXTVAL          64  /* NEXTVAL is not implemented for vcols */
-#define VCOL_CHECK_CONSTRAINT_IF_NOT_EXISTS 128
 
 #define VCOL_NOT_STRICTLY_DETERMINISTIC                       \
   (VCOL_NON_DETERMINISTIC | VCOL_TIME_FUNC | VCOL_SESSION_FUNC)
@@ -590,6 +589,7 @@ public:
   bool stored_in_db;
   bool utf8;                                    /* Already in utf8 */
   bool automatic_name;
+  bool if_not_exists;
   Item *expr;
   Lex_ident name;                               /* Name of constraint */
   /* see VCOL_* (VCOL_FIELD_REF, ...) */
@@ -605,7 +605,7 @@ public:
     name.length= 0;
   };
   Virtual_column_info* clone(THD *thd);
-  ~Virtual_column_info() {};
+  ~Virtual_column_info() = default;
   enum_vcol_info_type get_vcol_type() const
   {
     return vcol_type;
@@ -895,7 +895,7 @@ public:
   Field(uchar *ptr_arg,uint32 length_arg,uchar *null_ptr_arg,
         uchar null_bit_arg, utype unireg_check_arg,
         const LEX_CSTRING *field_name_arg);
-  virtual ~Field() {}
+  virtual ~Field() = default;
 
   virtual Type_numeric_attributes type_numeric_attributes() const
   {
@@ -1845,7 +1845,14 @@ public:
   key_map get_possible_keys();
 
   /* Hash value */
-  virtual void hash(ulong *nr, ulong *nr2);
+  void hash(Hasher *hasher)
+  {
+    if (is_null())
+      hasher->add_null();
+    else
+      hash_not_null(hasher);
+  }
+  virtual void hash_not_null(Hasher *hasher);
 
   /**
     Get the upper limit of the MySQL integral and floating-point type.
@@ -4221,7 +4228,7 @@ public:
                        uchar *new_ptr, uint32 length,
                        uchar *new_null_ptr, uint new_null_bit) override;
   bool is_equal(const Column_definition &new_field) const override;
-  void hash(ulong *nr, ulong *nr2) override;
+  void hash_not_null(Hasher *hasher) override;
   uint length_size() const override { return length_bytes; }
   void print_key_value(String *out, uint32 length) override;
   Binlog_type_info binlog_type_info() const override;
@@ -4481,6 +4488,7 @@ public:
   bool make_empty_rec_store_default_value(THD *thd, Item *item) override;
   int store(const char *to, size_t length, CHARSET_INFO *charset) override;
   using Field_str::store;
+  void hash_not_null(Hasher *hasher) override;
   double val_real() override;
   longlong val_int() override;
   String *val_str(String *, String *) override;
@@ -5051,7 +5059,7 @@ public:
     if (bit_ptr)
       bit_ptr= ADD_TO_PTR(bit_ptr, ptr_diff, uchar*);
   }
-  void hash(ulong *nr, ulong *nr2) override;
+  void hash_not_null(Hasher *hasher) override;
 
   SEL_ARG *get_mm_leaf(RANGE_OPT_PARAM *param, KEY_PART *key_part,
                        const Item_bool_func *cond,
@@ -5369,7 +5377,7 @@ public:
   bool sp_prepare_create_field(THD *thd, MEM_ROOT *mem_root);
 
   bool prepare_stage1(THD *thd, MEM_ROOT *mem_root,
-                      handler *file, ulonglong table_flags,
+                      column_definition_type_t type,
                       const Column_derived_attributes *derived_attr);
   void prepare_stage1_simple(CHARSET_INFO *cs)
   {
@@ -5377,11 +5385,9 @@ public:
     create_length_to_internal_length_simple();
   }
   bool prepare_stage1_typelib(THD *thd, MEM_ROOT *mem_root,
-                              handler *file, ulonglong table_flags);
-  bool prepare_stage1_string(THD *thd, MEM_ROOT *mem_root,
-                             handler *file, ulonglong table_flags);
-  bool prepare_stage1_bit(THD *thd, MEM_ROOT *mem_root,
-                          handler *file, ulonglong table_flags);
+                              column_definition_type_t deftype);
+  bool prepare_stage1_string(THD *thd, MEM_ROOT *mem_root);
+  bool prepare_stage1_bit(THD *thd, MEM_ROOT *mem_root);
 
   bool bulk_alter(const Column_derived_attributes *derived_attr,
                   const Column_bulk_alter_attributes *bulk_attr)
@@ -5851,8 +5857,8 @@ public:
   Field *from_field,*to_field;
   String tmp;					// For items
 
-  Copy_field() {}
-  ~Copy_field() {}
+  Copy_field() = default;
+  ~Copy_field() = default;
   void set(Field *to,Field *from,bool save);	// Field to field 
   void set(uchar *to,Field *from);		// Field to string
   void (*do_copy)(Copy_field *);

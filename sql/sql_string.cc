@@ -677,31 +677,35 @@ bool String::append_with_prefill(const char *s,uint32 arg_length,
 }
 
 
-int Binary_string::strstr(const Binary_string &s, uint32 offset)
+int Binary_string::strstr(const char *search, uint32 search_length, uint32 offset)
 {
-  if (s.length()+offset <= str_length)
+  if (search_length + offset <= str_length)
   {
-    if (!s.length())
+    if (!search_length)
       return ((int) offset);	// Empty string is always found
 
-    const char *str = Ptr+offset;
-    const char *search=s.ptr();
-    const char *end=Ptr+str_length-s.length()+1;
-    const char *search_end=s.ptr()+s.length();
+    const char *str= Ptr + offset;
+    const char *end= Ptr + str_length - search_length + 1;
+    const char *search_end= search + search_length;
 skip:
     while (str != end)
     {
       if (*str++ == *search)
       {
-	char *i,*j;
-	i=(char*) str; j=(char*) search+1;
-	while (j != search_end)
-	  if (*i++ != *j++) goto skip;
-	return (int) (str-Ptr) -1;
+        char *i= (char*) str;
+        char *j= (char*) search + 1 ;
+        while (j != search_end)
+          if (*i++ != *j++) goto skip;
+        return (int) (str-Ptr) -1;
       }
     }
   }
   return -1;
+}
+
+int Binary_string::strstr(const Binary_string &s, uint32 offset)
+{
+  return strstr(s.ptr(), s.length(), offset);
 }
 
 /*
@@ -1146,7 +1150,6 @@ String_copier::well_formed_copy(CHARSET_INFO *to_cs,
 }
 
 
-
 /*
   Append characters to a single-quoted string '...', escaping special
   characters with backslashes as necessary.
@@ -1164,6 +1167,8 @@ bool String::append_for_single_quote(const char *st, size_t len)
     case '\\':   APPEND(STRING_WITH_LEN("\\\\"));
     case '\0':   APPEND(STRING_WITH_LEN("\\0"));
     case '\'':   APPEND(STRING_WITH_LEN("\\'"));
+    case '\b':   APPEND(STRING_WITH_LEN("\\b"));
+    case '\t':   APPEND(STRING_WITH_LEN("\\t"));
     case '\n':   APPEND(STRING_WITH_LEN("\\n"));
     case '\r':   APPEND(STRING_WITH_LEN("\\r"));
     case '\032': APPEND(STRING_WITH_LEN("\\Z"));

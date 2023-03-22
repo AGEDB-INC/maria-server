@@ -344,6 +344,7 @@ select_unit::create_result_table(THD *thd_arg, List<Item> *column_types,
   DBUG_ASSERT(table == 0);
   tmp_table_param.init();
   tmp_table_param.field_count= column_types->elements;
+  tmp_table_param.func_count= tmp_table_param.field_count;
   tmp_table_param.bit_fields_as_long= bit_fields_as_long;
   tmp_table_param.hidden_field_count= hidden;
 
@@ -354,8 +355,6 @@ select_unit::create_result_table(THD *thd_arg, List<Item> *column_types,
     return TRUE;
 
   table->keys_in_use_for_query.clear_all();
-  for (uint i=0; i < table->s->fields; i++)
-    table->field[i]->flags &= ~(PART_KEY_FLAG | PART_INDIRECT_KEY_FLAG);
 
   if (create_table)
   {
@@ -384,7 +383,8 @@ select_union_recursive::create_result_table(THD *thd_arg,
     return true;
   
   incr_table_param.init();
-  incr_table_param.field_count= column_types->elements;
+  incr_table_param.field_count= incr_table_param.func_count=
+    column_types->elements;
   incr_table_param.bit_fields_as_long= bit_fields_as_long;
   if (! (incr_table= create_tmp_table(thd_arg, &incr_table_param, *column_types,
                                       (ORDER*) 0, false, 1,
@@ -393,9 +393,6 @@ select_union_recursive::create_result_table(THD *thd_arg,
     return true;
 
   incr_table->keys_in_use_for_query.clear_all();
-  for (uint i=0; i < table->s->fields; i++)
-    incr_table->field[i]->flags &= ~(PART_KEY_FLAG | PART_INDIRECT_KEY_FLAG);
-
   return false;
 }
 
@@ -1302,6 +1299,7 @@ bool st_select_lex_unit::prepare(TABLE_LIST *derived_arg,
   bool instantiate_tmp_table= false;
   bool single_tvc= !first_sl->next_select() && first_sl->tvc;
   bool single_tvc_wo_order= single_tvc && !first_sl->order_list.elements;
+  bool distinct_key= 0;
   DBUG_ENTER("st_select_lex_unit::prepare");
   DBUG_ASSERT(thd == current_thd);
 
@@ -1405,15 +1403,17 @@ bool st_select_lex_unit::prepare(TABLE_LIST *derived_arg,
     {
     case INTERSECT_TYPE:
       have_intersect= TRUE;
-      if (!s->distinct){
-        have_except_all_or_intersect_all= true;
-      }
+      if (!s->distinct)
+        have_except_all_or_intersect_all= TRUE;
       break;
     case EXCEPT_TYPE:
       have_except= TRUE;
-      if (!s->distinct){
+      if (!s->distinct)
         have_except_all_or_intersect_all= TRUE;
-      }
+      break;
+    case DERIVED_TABLE_TYPE:
+      if (s->distinct)
+        distinct_key= 1;
       break;
     default:
       break;
@@ -1620,7 +1620,8 @@ bool st_select_lex_unit::prepare(TABLE_LIST *derived_arg,
         if (join_union_item_types(thd, types, union_part_count + 1))
           goto err;
         if (union_result->create_result_table(thd, &types,
-                                              MY_TEST(union_distinct),
+                                              (MY_TEST(union_distinct) ||
+                                               distinct_key),
                                               create_options,
                                               &derived_arg->alias, false,
                                               instantiate_tmp_table, false,
@@ -1643,7 +1644,7 @@ bool st_select_lex_unit::prepare(TABLE_LIST *derived_arg,
 
           res= derived_arg->derived_result->create_result_table(thd,
                                                             &types,
-                                                            FALSE,
+                                                            distinct_key,
                                                             create_options,
                                                             &derived_arg->alias,
                                                             FALSE, FALSE,
@@ -1767,9 +1768,9 @@ cont:
         union_result->create_result_table(thd, &types,
                                           MY_TEST(union_distinct) ||
                                             have_except_all_or_intersect_all ||
-                                            have_intersect,
-                                          create_options, &empty_clex_str, false,
-                                          instantiate_tmp_table, false,
+                                            have_intersect || distinct_key,
+                                          create_options, &empty_clex_str,
+                                          false, instantiate_tmp_table, false,
                                           hidden);
       union_result->addon_cnt= hidden;
       for (uint i= 0; i < hidden; i++)   
@@ -2156,8 +2157,8 @@ bool st_select_lex_unit::exec()
   ulonglong add_rows=0;
   ha_rows examined_rows= 0;
   bool first_execution= !executed;
-  DBUG_ENTER("st_select_lex_unit::exec");
   bool was_executed= executed;
+  DBUG_ENTER("st_select_lex_unit::exec");
 
   if (executed && !uncacheable && !describe)
     DBUG_RETURN(FALSE);
@@ -2244,7 +2245,7 @@ bool st_select_lex_unit::exec()
 	if (sl->tvc)
 	  sl->tvc->exec(sl);
 	else
-	  sl->join->exec();
+	  saved_error= sl->join->exec();
         if (sl == union_distinct && !have_except_all_or_intersect_all &&
             !(with_element && with_element->is_recursive))
 	{
@@ -2254,8 +2255,6 @@ bool st_select_lex_unit::exec()
 	    DBUG_RETURN(TRUE);
 	  table->no_keyread=1;
 	}
-	if (!sl->tvc)
-	  saved_error= sl->join->error;
 	if (likely(!saved_error))
 	{
 	  examined_rows+= thd->get_examined_row_count();
@@ -2402,7 +2401,8 @@ bool st_select_lex_unit::exec()
         {
           join->join_examined_rows= 0;
           saved_error= join->reinit();
-          join->exec();
+          if (join->exec())
+            saved_error= 1;
         }
       }
 
@@ -2508,8 +2508,7 @@ bool st_select_lex_unit::exec_recursive()
       sl->tvc->exec(sl);
     else
     {
-      sl->join->exec();
-      saved_error= sl->join->error;
+      saved_error= sl->join->exec();
     }
     if (likely(!saved_error))
     {
@@ -2521,11 +2520,10 @@ bool st_select_lex_unit::exec_recursive()
 	 DBUG_RETURN(1);
        }
     }
-    if (unlikely(saved_error))
+    else
     {
       thd->lex->current_select= lex_select_save;
       goto err;
-      
     }
   }
 

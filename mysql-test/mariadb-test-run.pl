@@ -145,6 +145,7 @@ my $opt_start_exit;
 my $start_only;
 my $file_wsrep_provider;
 my $num_saved_cores= 0;  # Number of core files saved in vardir/log/ so far.
+my $test_name_for_report;
 
 our @global_suppressions;
 
@@ -515,13 +516,13 @@ sub main {
   }
 
   if ( not @$completed ) {
-    my $test_name= mtr_grab_file($path_testlog);
-    $test_name =~ s/^CURRENT_TEST:\s//;
-    chomp($test_name);
-    my $tinfo = My::Test->new(name => $test_name);
-    $tinfo->{result}= 'MTR_RES_FAILED';
-    $tinfo->{comment}=' ';
-    mtr_report_test($tinfo);
+    if ($test_name_for_report)
+    {
+      my $tinfo = My::Test->new(name => $test_name_for_report);
+      $tinfo->{result}= 'MTR_RES_FAILED';
+      $tinfo->{comment}=' ';
+      mtr_report_test($tinfo);
+    }
     mtr_error("Test suite aborted");
   }
 
@@ -2713,6 +2714,7 @@ sub mysql_server_start($) {
         # Copy datadir from installed system db
         my $path= ($opt_parallel == 1) ? "$opt_vardir" : "$opt_vardir/..";
         my $install_db= "$path/install.db";
+        mtr_verbose("copying $install_db to $datadir");
         copytree($install_db, $datadir) if -d $install_db;
         mtr_error("Failed to copy system db to '$datadir'") unless -d $datadir;
       }
@@ -3740,8 +3742,8 @@ sub resfile_report_test ($) {
 sub run_testcase ($$) {
   my ($tinfo, $server_socket)= @_;
   my $print_freq=20;
-
-  mtr_verbose("Running test:", $tinfo->{name});
+  $test_name_for_report= $tinfo->{name};
+  mtr_verbose("Running test:", $test_name_for_report);
   $ENV{'MTR_TEST_NAME'} = $tinfo->{name};
   resfile_report_test($tinfo) if $opt_resfile;
 
@@ -5130,12 +5132,10 @@ sub mysqld_start ($$) {
   if (!$rc)
   {
     # Report failure about the last test case before exit
-    my $test_name= mtr_grab_file($path_current_testlog);
-    $test_name =~ s/^CURRENT_TEST:\s//;
-    my $tinfo = My::Test->new(name => $test_name);
+    my $tinfo = My::Test->new(name => $test_name_for_report);
     $tinfo->{result}= 'MTR_RES_FAILED';
     $tinfo->{failures}= 1;
-    $tinfo->{logfile}=get_log_from_proc($mysqld->{'proc'}, $tinfo->{name});
+    $tinfo->{logfile}=get_log_from_proc($mysqld->{'proc'}, $test_name_for_report);
     report_option('verbose', 1);
     mtr_report_test($tinfo);
   }

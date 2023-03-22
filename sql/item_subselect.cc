@@ -42,6 +42,7 @@
 #include "sql_parse.h"                          // check_stack_overrun
 #include "sql_cte.h"
 #include "sql_test.h"
+#include "opt_trace.h"
 
 double get_post_group_estimate(JOIN* join, double join_op_rows);
 
@@ -1588,8 +1589,9 @@ Item_exists_subselect::Item_exists_subselect(THD *thd,
 {
   DBUG_ENTER("Item_exists_subselect::Item_exists_subselect");
 
-
   init(select_lex, new (thd->mem_root) select_exists_subselect(thd, this));
+  select_lex->distinct= 1;
+  select_lex->master_unit()->distinct= 1;
   max_columns= UINT_MAX;
   null_value= FALSE; //can't be NULL
   base_flags&= ~item_base_t::MAYBE_NULL; //can't be NULL
@@ -1640,6 +1642,39 @@ Item_in_subselect::Item_in_subselect(THD *thd, Item * left_exp,
       Item_row(thd, static_cast<Item_row*>(left_exp));
   func= &eq_creator;
   init(select_lex, new (thd->mem_root) select_exists_subselect(thd, this));
+  select_lex->distinct= 1;
+
+  /*
+    If the IN subquery (xxx IN (SELECT ...) is a join without grouping,
+    we don't need duplicates from the tables it is joining. These
+    tables can be derived tables, like shown in the following
+    example. In this case, it's useful to indicate that we don't need
+    duplicates from them either.
+
+    Example:
+     col IN (SELECT ...   -- this is the select_lex
+              FROM
+                (SELECT ... FROM t1) AS t1, -- child1, first_inner_init().
+                (SELECT ... FROM t2) AS t2, -- child2
+              WHERE
+                ...
+            )
+
+     We don't need duplicates from either child1 or child2.
+     We only indicate this to child1 (select_lex->first_inner_unit()), as that
+     catches most of practically important use cases.
+
+     (The check for item==NULL is to make sure the subquery is a derived table
+     and not any other kind of subquery like another IN (SELECT ...) or a scalar-
+     context (SELECT 'foo'))
+  */
+
+  select_lex->master_unit()->distinct= 1;
+  if (!select_lex->with_sum_func &&
+      select_lex->first_inner_unit() &&
+      select_lex->first_inner_unit()->item == NULL)
+    select_lex->first_inner_unit()->distinct= 1;
+
   max_columns= UINT_MAX;
   set_maybe_null();
   reset();
@@ -1667,6 +1702,16 @@ Item_allany_subselect::Item_allany_subselect(THD *thd, Item * left_exp,
       Item_row(thd, static_cast<Item_row*>(left_exp));
   func= func_creator(all_arg);
   init(select_lex, new (thd->mem_root) select_exists_subselect(thd, this));
+  select_lex->distinct= 1;
+  /*
+    If this is is 'xxx IN (SELECT ...) mark that the we are only interested in
+    unique values for the select
+  */
+  select_lex->master_unit()->distinct= 1;
+  if (!select_lex->with_sum_func &&
+      select_lex->first_inner_unit() &&
+      select_lex->first_inner_unit()->item == NULL)
+    select_lex->first_inner_unit()->distinct= 1;
   max_columns= 1;
   reset();
   //if test_limit will fail then error will be reported to client
@@ -2906,7 +2951,9 @@ bool Item_exists_subselect::select_prepare_to_be_in()
   bool trans_res= FALSE;
   DBUG_ENTER("Item_exists_subselect::select_prepare_to_be_in");
   if (!optimizer &&
-      thd->lex->sql_command == SQLCOM_SELECT &&
+      (thd->lex->sql_command == SQLCOM_SELECT ||
+       thd->lex->sql_command == SQLCOM_UPDATE_MULTI ||
+       thd->lex->sql_command == SQLCOM_DELETE_MULTI) &&
       !unit->first_select()->is_part_of_union() &&
       optimizer_flag(thd, OPTIMIZER_SWITCH_EXISTS_TO_IN) &&
       (is_top_level_item() ||
@@ -3298,6 +3345,14 @@ bool Item_exists_subselect::exists2in_processor(void *opt_arg)
     set possible optimization strategies
   */
   in_subs->emb_on_expr_nest= emb_on_expr_nest;
+
+  {
+    OPT_TRACE_TRANSFORM(thd, trace_wrapper, trace_transform,
+  		        in_subs->get_select_lex()->select_number,
+  			"EXISTS (SELECT)", "IN (SELECT)");
+    trace_transform.add( "upper_not", ( upper_not?true:false ) );
+  }
+
   res= check_and_do_in_subquery_rewrites(join);
   first_select->join->prepare_stage2();
 
@@ -4007,6 +4062,7 @@ int subselect_single_select_engine::exec()
   char const *save_where= thd->where;
   SELECT_LEX *save_select= thd->lex->current_select;
   thd->lex->current_select= select_lex;
+  bool exec_error= 0;
   DBUG_ENTER("subselect_single_select_engine::exec");
 
   if (join->optimization_state == JOIN::NOT_OPTIMIZED)
@@ -4098,7 +4154,7 @@ int subselect_single_select_engine::exec()
       }
     }
     
-    join->exec();
+    exec_error= join->exec();
 
     /* Enable the optimizations back */
     for (JOIN_TAB **ptab= changed_tabs; ptab != last_changed_tab; ptab++)
@@ -4116,7 +4172,7 @@ int subselect_single_select_engine::exec()
       item->make_const();
     thd->where= save_where;
     thd->lex->current_select= save_select;
-    DBUG_RETURN(join->error || thd->is_fatal_error || thd->is_error());
+    DBUG_RETURN(exec_error || thd->is_error());
   }
   thd->where= save_where;
   thd->lex->current_select= save_select;
@@ -5663,9 +5719,8 @@ int subselect_hash_sj_engine::exec()
   /* The subquery should be optimized, and materialized only once. */
   DBUG_ASSERT(materialize_join->optimization_state == JOIN::OPTIMIZATION_DONE &&
               !is_materialized);
-  materialize_join->exec();
-  if (unlikely((res= MY_TEST(materialize_join->error || thd->is_fatal_error ||
-                             thd->is_error()))))
+  res= materialize_join->exec();
+  if (unlikely((res= (res || thd->is_error()))))
     goto err;
 
   /*

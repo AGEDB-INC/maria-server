@@ -398,14 +398,16 @@ protected:
 
 public:
 
+#ifdef ENABLED_JSON_WRITER_CONSISTENCY_CHECKS
   virtual ~Json_writer_struct()
   {
-#ifdef ENABLED_JSON_WRITER_CONSISTENCY_CHECKS
     named_items_expectation.pop_back();
-#endif
   }
+#else
+  virtual ~Json_writer_struct() = default;
+#endif
 
-  bool trace_started() const
+  inline bool trace_started() const
   {
     return my_writer != 0;
   }

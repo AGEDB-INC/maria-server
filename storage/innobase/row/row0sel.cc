@@ -4040,7 +4040,8 @@ row_search_idx_cond_check(
 	ut_ad(rec_offs_validate(rec, prebuilt->index, offsets));
 
 	if (!prebuilt->idx_cond) {
-		if (!handler_rowid_filter_is_active(prebuilt->pk_filter)) {
+		if (!prebuilt->pk_filter ||
+                    !handler_rowid_filter_is_active(prebuilt->pk_filter)) {
 			return(CHECK_POS);
 		}
 	} else {
@@ -4082,7 +4083,8 @@ row_search_idx_cond_check(
 
 	switch (result) {
 	case CHECK_POS:
-	        if (handler_rowid_filter_is_active(prebuilt->pk_filter)) {
+	        if (prebuilt->pk_filter &&
+                  handler_rowid_filter_is_active(prebuilt->pk_filter)) {
 		        ut_ad(!prebuilt->index->is_primary());
 		        if (prebuilt->clust_index_was_generated) {
                                ulint len;
@@ -4770,7 +4772,7 @@ wait_table_again:
 	} else if (dtuple_get_n_fields(search_tuple) > 0) {
 		pcur->old_rec = nullptr;
 
-		if (dict_index_is_spatial(index)) {
+		if (index->is_spatial()) {
 			if (!prebuilt->rtr_info) {
 				prebuilt->rtr_info = rtr_create_rtr_info(
 					set_also_gap_locks, true, thr,
@@ -4786,10 +4788,14 @@ wait_table_again:
 				prebuilt->rtr_info->search_tuple = search_tuple;
 				prebuilt->rtr_info->search_mode = mode;
 			}
-		}
 
-		err = btr_pcur_open_with_no_init(search_tuple, mode,
-						 BTR_SEARCH_LEAF, pcur, &mtr);
+			err = rtr_search_leaf(pcur, thr, search_tuple, mode,
+					      &mtr);
+		} else {
+			err = btr_pcur_open_with_no_init(search_tuple, mode,
+							 BTR_SEARCH_LEAF,
+							 pcur, &mtr);
+		}
 
 		if (err != DB_SUCCESS) {
 page_corrupted:
@@ -5766,8 +5772,7 @@ next_rec_after_check:
 
 	if (spatial_search) {
 		/* No need to do store restore for R-tree */
-		mtr.commit();
-		mtr.start();
+		mtr.rollback_to_savepoint(0);
 	} else if (mtr_extra_clust_savepoint) {
 		/* We must release any clustered index latches
 		if we are moving to the next non-clustered

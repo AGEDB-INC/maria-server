@@ -17,14 +17,13 @@
 
 # This scripts creates the MariaDB Server system tables
 #
-# All unrecognized arguments to this script are passed to mysqld.
+# All unrecognized arguments to this script are passed to mariadbd.
 
 basedir=""
 builddir=""
 ldata="@localstatedir@"
 langdir=""
 srcdir=""
-log_error=""
 
 args=""
 defaults=""
@@ -33,6 +32,7 @@ mysqld_opt=""
 user=""
 group=""
 silent_startup="--silent-startup"
+log_error=""
 
 force=0
 in_rpm=0
@@ -45,6 +45,12 @@ extra_file=""
 
 dirname0=`dirname $0 2>/dev/null`
 dirname0=`dirname $dirname0 2>/dev/null`
+
+case "$0" in
+  *mysqld_install_db)
+    echo "$0: Deprecated program name. It will be removed in a future release, use 'mariadb-install-db' instead" 1>&2
+    ;;
+esac
 
 usage()
 {
@@ -76,7 +82,7 @@ Usage: $0 [OPTIONS]
   --defaults-group-suffix=name
                        In addition to the given groups, read also groups with
                        this suffix
-  --force              Causes mysql_install_db to run even if DNS does not
+  --force              Causes mariadb-install-db to run even if DNS does not
                        work.  In that case, grant table entries that
                        normally use hostnames will use IP addresses.
   --help               Display this help and exit.
@@ -92,20 +98,20 @@ Usage: $0 [OPTIONS]
                        uses the compiled binaries and support files within the
                        source tree, useful for if you don't want to install
                        MariaDB yet and just want to create the system tables.
-  --user=user_name     The login username to use for running mysqld.  Files
-                       and directories created by mysqld will be owned by this
+  --user=user_name     The login username to use for running mariadbd.  Files
+                       and directories created by mariadbd will be owned by this
                        user.  You must be root to use this option.  By default
-                       mysqld runs using your current login name and files and
+                       mariadbd runs using your current login name and files and
                        directories that it creates will be owned by you.
-  --group=group_name   The login group to use for running mysqld.  Files and
-                       directories created by mysqld will be owned by this
+  --group=group_name   The login group to use for running mariadbd.  Files and
+                       directories created by mariadbd will be owned by this
                        group. You must be root to use this option.  By default
-                       mysqld runs using your current group and files and
+                       mariadbd runs using your current group and files and
                        directories that it creates will be owned by you.
   --extra-file=file    Add user defined SQL file, to be executed following
                        regular database initialization.
 
-All other options are passed to the mysqld program
+All other options are passed to the mariadbd program
 
 EOF
   exit 1
@@ -122,7 +128,7 @@ s_echo()
 link_to_help()
 {
   echo
-  echo "The latest information about mysql_install_db is available at"
+  echo "The latest information about mariadb-install-db is available at"
   echo "https://mariadb.com/kb/en/installing-system-tables-mysql_install_db"
 }
 
@@ -155,7 +161,7 @@ parse_arguments()
        # Keep in the arguments passed to the server
        args="$args $arg"
        log_error=`parse_arg "$arg"` ;;
-        # Note that the user will be passed to mysqld so that it runs
+        # Note that the user will be passed to mariadbd so that it runs
         # as 'user' (crucial e.g. if log-bin=/some_other_path/
         # where a chown of datadir won't help)
       --user=*) user=`parse_arg "$arg"` ;;
@@ -322,9 +328,9 @@ then
   exit 1
 fi
 
-# Now we can get arguments from the groups [mysqld] and [mysql_install_db]
+# Now we can get arguments from the groups [mariadbd] and [mysql_install_db]
 # in the my.cfg file, then re-run to merge with command line arguments.
-parse_arguments `"$print_defaults" $defaults $defaults_group_suffix --mysqld mysql_install_db mariadb-install-db`
+parse_arguments `"$print_defaults" $defaults $defaults_group_suffix --mariadbd mysql_install_db mariadb-install-db`
 
 parse_arguments PICK-ARGS-FROM-ARGV "$@"
 
@@ -336,7 +342,7 @@ then
   basedir="$builddir"
   bindir="$basedir/client"
   resolveip="$basedir/extra/resolveip"
-  mysqld="$basedir/sql/mysqld"
+  mysqld="$basedir/sql/mariadbd"
   langdir="$basedir/sql/share/english"
   srcpkgdatadir="$srcdir/scripts"
   buildpkgdatadir="$builddir/scripts"
@@ -461,7 +467,7 @@ then
     fi
     echo "WARNING: The host '$hostname' could not be looked up with $resolveip."
     echo "This probably means that your libc libraries are not 100 % compatible"
-    echo "with this binary MariaDB version. The MariaDB daemon, mysqld, should work"
+    echo "with this binary MariaDB version. The MariaDB daemon, mariadbd, should work"
     echo "normally with the exception that host name resolving will not work."
     echo "This means that you should use IP addresses instead of hostnames"
     echo "when specifying MariaDB privileges !"
@@ -527,7 +533,7 @@ then
   args="$args --user=$user"
 fi
 
-#To be enabled if/when we enable --group as an option to mysqld
+#To be enabled if/when we enable --group as an option to mariadbd
 #if test -n "$group"
 #then
 #  args="$args --group=$group"
@@ -536,7 +542,7 @@ fi
 if test -f "$ldata/mysql/user.frm"
 then
     echo "mysql.user table already exists!"
-    echo "Run mysql_upgrade, not mysql_install_db"
+    echo "Run mariadb-upgrade, not mariadb-install-db"
     exit 0
 fi
 
@@ -550,7 +556,26 @@ else
   filter_cmd_line="cat"
 fi
 
-# Configure mysqld command line
+# Disable log error if the user don't have right to write/create the file
+# This is common when a user tries to install a personal mariadbd server and
+# the global config in /etc is using --log-error.
+# The server will internally change log-error to stderr to stderr if it cannot
+# write the the log file. This code only disables the error message from a not
+# writable log-error, which can be confusing.
+if test -n "$log_error"
+then
+    if test \( -e "$log_error" -a \! -w "$log_error" \) -o \( ! -e "$log_error" -a ! -w "`dirname "$log_error"`" \)
+    then
+        if test -n "$verbose"
+        then
+            echo "resetting log-error '$log_error' because no write access"
+        fi
+        log_error=""
+        args="$args --skip-log-error"
+    fi
+fi
+
+# Configure mariadbd command line
 mysqld_bootstrap="${MYSQLD_BOOTSTRAP-$mysqld}"
 mysqld_install_cmd_line()
 {
@@ -593,11 +618,11 @@ cat_sql()
   fi
 }
 
-# Create the system and help tables by passing them to "mysqld --bootstrap"
+# Create the system and help tables by passing them to "mariadbd --bootstrap"
 s_echo "Installing MariaDB/MySQL system tables in '$ldata' ..."
 if cat_sql | eval "$filter_cmd_line" | mysqld_install_cmd_line > /dev/null
 then
-    printf "@VERSION@-MariaDB" > "$ldata/mysql_upgrade_info"
+    printf "@VERSION@-MariaDB" > "$ldata/mariadb_upgrade_info"
   s_echo "OK"
 else
   log_file_place=$ldata
@@ -678,7 +703,7 @@ then
     echo "You can start the MariaDB daemon with:"
     echo "cd '$basedir' ; $bindir/mariadb-safe --datadir='$ldata'"
     echo
-    echo "You can test the MariaDB daemon with mysql-test-run.pl"
+    echo "You can test the MariaDB daemon with mariadb-test-run.pl"
     echo "cd '$basedir/@INSTALL_MYSQLTESTDIR@' ; perl mariadb-test-run.pl"
   fi
 

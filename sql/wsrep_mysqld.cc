@@ -56,7 +56,6 @@
 #include <sstream>
 
 /* wsrep-lib */
-Wsrep_server_state* Wsrep_server_state::m_instance;
 
 my_bool wsrep_emulate_bin_log= FALSE; // activating parts of binlog interface
 my_bool wsrep_preordered_opt= FALSE;
@@ -365,10 +364,12 @@ static void wsrep_log_cb(wsrep::log::level level,
 void wsrep_init_gtid()
 {
   wsrep_server_gtid_t stored_gtid= wsrep_get_SE_checkpoint<wsrep_server_gtid_t>();
+  // Domain id may have changed, use the one
+  // received during state transfer.
+  stored_gtid.domain_id= wsrep_gtid_server.domain_id;
   if (stored_gtid.server_id == 0)
   {
     rpl_gtid wsrep_last_gtid;
-    stored_gtid.domain_id= wsrep_gtid_server.domain_id;
     if (mysql_bin_log.is_open() &&
         mysql_bin_log.lookup_domain_in_binlog_state(stored_gtid.domain_id,
                                                     &wsrep_last_gtid))
@@ -866,12 +867,13 @@ int wsrep_init()
   wsrep_init_position();
   wsrep_sst_auth_init();
 
-  if (strlen(wsrep_provider)== 0 ||
-      !strcmp(wsrep_provider, WSREP_NONE))
+  if (!*wsrep_provider ||
+      !strcasecmp(wsrep_provider, WSREP_NONE))
   {
     // enable normal operation in case no provider is specified
     global_system_variables.wsrep_on= 0;
-    int err= Wsrep_server_state::instance().load_provider(wsrep_provider, wsrep_provider_options ? wsrep_provider_options : "");
+    int err= Wsrep_server_state::init_provider(
+        wsrep_provider, wsrep_provider_options ? wsrep_provider_options : "");
     if (err)
     {
       DBUG_PRINT("wsrep",("wsrep::init() failed: %d", err));
@@ -913,14 +915,14 @@ int wsrep_init()
                 "wsrep_trx_fragment_size to 0 or use wsrep_provider that "
                 "supports streaming replication.",
                 wsrep_provider, global_system_variables.wsrep_trx_fragment_size);
-    Wsrep_server_state::instance().unload_provider();
+    Wsrep_server_state::instance().deinit_provider();
     Wsrep_server_state::deinit_provider_services();
     return 1;
   }
 
   /* Now WSREP is fully initialized */
   global_system_variables.wsrep_on= 1;
-  WSREP_ON_= wsrep_provider && strcmp(wsrep_provider, WSREP_NONE);
+  WSREP_ON_= wsrep_provider && *wsrep_provider && strcasecmp(wsrep_provider, WSREP_NONE);
   wsrep_service_started= 1;
 
   wsrep_init_provider_status_variables();
@@ -929,7 +931,6 @@ int wsrep_init()
 
   WSREP_DEBUG("SR storage init for: %s",
               (wsrep_SR_store_type == WSREP_SR_STORE_TABLE) ? "table" : "void");
-
   return 0;
 }
 
@@ -990,7 +991,8 @@ void wsrep_init_startup (bool sst_first)
     wsrep_plugins_pre_init();
 
   /* Skip replication start if dummy wsrep provider is loaded */
-  if (!strcmp(wsrep_provider, WSREP_NONE)) return;
+  if (!wsrep_provider || !*wsrep_provider ||
+      !strcasecmp(wsrep_provider, WSREP_NONE)) return;
 
   /* Skip replication start if no cluster address */
   if (!wsrep_cluster_address_exists()) return;
@@ -1004,6 +1006,11 @@ void wsrep_init_startup (bool sst_first)
   wsrep_create_rollbacker();
   wsrep_create_appliers(1);
 
+  if (Wsrep_server_state::init_options())
+  {
+    WSREP_WARN("Failed to initialize provider options");
+  }
+
   Wsrep_server_state& server_state= Wsrep_server_state::instance();
   /*
     If the SST happens before server initialization, wait until the server
@@ -1013,13 +1020,19 @@ void wsrep_init_startup (bool sst_first)
     With mysqldump SST (!sst_first) wait until the server reaches
     joiner state and procedd to accepting connections.
   */
+  int err= 0;
   if (sst_first)
   {
-    server_state.wait_until_state(Wsrep_server_state::s_initializing);
+    err= server_state.wait_until_state(Wsrep_server_state::s_initializing);
   }
   else
   {
-    server_state.wait_until_state(Wsrep_server_state::s_joiner);
+    err= server_state.wait_until_state(Wsrep_server_state::s_joiner);
+  }
+  if (err)
+  {
+    WSREP_ERROR("Wsrep startup was interrupted");
+    unireg_abort(1);
   }
 }
 
@@ -1029,7 +1042,7 @@ void wsrep_deinit(bool free_options)
   DBUG_ASSERT(wsrep_inited == 1);
   WSREP_DEBUG("wsrep_deinit");
 
-  Wsrep_server_state::instance().unload_provider();
+  Wsrep_server_state::deinit_provider();
   Wsrep_server_state::deinit_provider_services();
 
   provider_name[0]=    '\0';
@@ -1126,7 +1139,11 @@ void wsrep_stop_replication(THD *thd)
   {
     WSREP_DEBUG("Disconnect provider");
     Wsrep_server_state::instance().disconnect();
-    Wsrep_server_state::instance().wait_until_state(Wsrep_server_state::s_disconnected);
+    if (Wsrep_server_state::instance().wait_until_state(
+            Wsrep_server_state::s_disconnected))
+    {
+      WSREP_WARN("Wsrep interrupted while waiting for disconnected state");
+    }
   }
 
   /* my connection, should not terminate with wsrep_close_client_connection(),
@@ -1148,7 +1165,11 @@ void wsrep_shutdown_replication()
   {
     WSREP_DEBUG("Disconnect provider");
     Wsrep_server_state::instance().disconnect();
-    Wsrep_server_state::instance().wait_until_state(Wsrep_server_state::s_disconnected);
+    if (Wsrep_server_state::instance().wait_until_state(
+            Wsrep_server_state::s_disconnected))
+    {
+      WSREP_WARN("Wsrep interrupted while waiting for disconnected state");
+    }
   }
 
   wsrep_close_client_connections(TRUE);
@@ -3131,6 +3152,11 @@ void wsrep_handle_mdl_conflict(MDL_context *requestor_ctx,
       THD_STAGE_INFO(request_thd, stage_waiting_ddl);
       ticket->wsrep_report(wsrep_debug);
       mysql_mutex_unlock(&granted_thd->LOCK_thd_data);
+      if (granted_thd->current_backup_stage != BACKUP_FINISHED &&
+	  wsrep_check_mode(WSREP_MODE_BF_MARIABACKUP))
+      {
+	wsrep_abort_thd(request_thd, granted_thd, 1);
+      }
     }
     else if (request_thd->lex->sql_command == SQLCOM_DROP_TABLE)
     {
@@ -3220,7 +3246,9 @@ static my_bool have_client_connections(THD *thd, void*)
 {
   DBUG_PRINT("quit",("Informing thread %lld that it's time to die",
                      (longlong) thd->thread_id));
-  if (is_client_connection(thd) && thd->killed == KILL_CONNECTION)
+  if (is_client_connection(thd) &&
+      (thd->killed == KILL_CONNECTION ||
+       thd->killed == KILL_CONNECTION_HARD))
   {
     (void)abort_replicated(thd);
     return 1;
@@ -3230,7 +3258,7 @@ static my_bool have_client_connections(THD *thd, void*)
 
 static void wsrep_close_thread(THD *thd)
 {
-  thd->set_killed(KILL_CONNECTION);
+  thd->set_killed(KILL_CONNECTION_HARD);
   MYSQL_CALLBACK(thread_scheduler, post_kill_notification, (thd));
   mysql_mutex_lock(&thd->LOCK_thd_kill);
   thd->abort_current_cond_wait(true);
@@ -3264,13 +3292,13 @@ static my_bool kill_all_threads(THD *thd, THD *caller_thd)
   if (is_client_connection(thd) && thd != caller_thd)
   {
     if (is_replaying_connection(thd))
-      thd->set_killed(KILL_CONNECTION);
+      thd->set_killed(KILL_CONNECTION_HARD);
     else if (!abort_replicated(thd))
     {
       /* replicated transactions must be skipped */
       WSREP_DEBUG("closing connection %lld", (longlong) thd->thread_id);
       /* instead of wsrep_close_thread() we do now  soft kill by THD::awake */
-      thd->awake(KILL_CONNECTION);
+      thd->awake(KILL_CONNECTION_HARD);
     }
   }
   return 0;
@@ -3406,7 +3434,7 @@ ignore_error:
   WSREP_WARN("Ignoring error '%s' on query. "
              "Default database: '%s'. Query: '%s', Error_code: %d",
              thd->get_stmt_da()->message(),
-             print_slave_db_safe(thd->db.str),
+             safe_str(thd->db.str),
              thd->query(),
              error);
   return 1;

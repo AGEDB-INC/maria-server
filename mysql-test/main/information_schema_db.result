@@ -26,8 +26,6 @@ declare ret_val int;
 select max(f1) from t1 into ret_val;
 return ret_val;
 end|
-Warnings:
-Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 create view v1 as select f1 from t1 where f1 = func1(f1);
 create function func2() returns int return 1;
 use mbase;
@@ -100,7 +98,7 @@ grant insert on v1 to testdb_2@localhost;
 create view v5 as select f1 from t1;
 grant select, show view on v5 to testdb_2@localhost;
 create definer=`no_such_user`@`no_such_host` view v6 as select f1 from t1;
-ERROR 42000: Access denied; you need (at least one of) the SUPER, SET USER privilege(s) for this operation
+ERROR 42000: Access denied; you need (at least one of) the SET USER privilege(s) for this operation
 connection default;
 use testdb_1;
 create view v6 as select f1 from t1;

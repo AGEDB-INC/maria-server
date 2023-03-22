@@ -88,6 +88,8 @@ ELSE()
   SET(CMAKE_CXX_STANDARD 11)
 ENDIF()
 
+# Lower case package names from PROJECT are used if not explictly upper case.
+SET(CPACK_PACKAGE_NAME "MariaDB")
 SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "MariaDB: a very fast and robust SQL database server")
 SET(CPACK_PACKAGE_URL "http://mariadb.org")
 
@@ -482,7 +484,7 @@ ADD_SUBDIRECTORY(support-files)
 ADD_SUBDIRECTORY(extra/aws_sdk)
 
 IF(NOT CMAKE_CROSSCOMPILING OR DEFINED CMAKE_CROSSCOMPILING_EMULATOR)
-  SET(EXPORTED comp_err comp_sql factorial)
+  SET(EXPORTED comp_err comp_sql factorial uca-dump)
   IF(NOT WITHOUT_SERVER)
     SET(EXPORTED ${EXPORTED} gen_lex_hash gen_lex_token)
   ENDIF()

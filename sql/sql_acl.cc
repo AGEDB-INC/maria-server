@@ -206,7 +206,7 @@ class ACL_USER :public ACL_USER_BASE,
 {
 public:
 
-  ACL_USER() { }
+  ACL_USER() = default;
   ACL_USER(THD *thd, const LEX_USER &combo,
            const Account_options &options,
            const privilege_t privileges);
@@ -351,7 +351,7 @@ class ACL_PROXY_USER :public ACL_ACCESS
     MYSQL_PROXIES_PRIV_GRANTOR,
     MYSQL_PROXIES_PRIV_TIMESTAMP } proxy_table_fields;
 public:
-  ACL_PROXY_USER () {};
+  ACL_PROXY_USER () = default;
 
   void init(const char *host_arg, const char *user_arg,
        const char *proxied_host_arg, const char *proxied_user_arg,
@@ -942,7 +942,7 @@ class User_table: public Grant_table_base
   virtual longlong get_password_lifetime () const = 0;
   virtual int set_password_lifetime (longlong x) const = 0;
 
-  virtual ~User_table() {}
+  virtual ~User_table() = default;
  private:
   friend class Grant_tables;
   virtual int setup_sysvars() const = 0;
@@ -1058,7 +1058,7 @@ class User_table_tabular: public User_table
       access|= DELETE_HISTORY_ACL;
 
     if (access & SUPER_ACL)
-      access|= GLOBAL_SUPER_ADDED_SINCE_USER_TABLE_ACLS;
+      access|= ALLOWED_BY_SUPER_BEFORE_101100 | ALLOWED_BY_SUPER_BEFORE_110000;
 
     /*
       The SHOW SLAVE HOSTS statement :
@@ -1291,7 +1291,7 @@ class User_table_tabular: public User_table
     return 1;
   }
 
-  virtual ~User_table_tabular() {}
+  virtual ~User_table_tabular() = default;
  private:
   friend class Grant_tables;
 
@@ -1545,10 +1545,15 @@ class User_table_json: public User_table
   {
     privilege_t mask= ALL_KNOWN_ACL_100304;
     ulonglong orig_access= access;
+    if (version_id < 110000)
+    {
+      if (access & SUPER_ACL)
+        access|= ALLOWED_BY_SUPER_BEFORE_110000;
+    }
     if (version_id < 101100)
     {
       if (access & SUPER_ACL)
-        access|= READ_ONLY_ADMIN_ACL;
+        access|= ALLOWED_BY_SUPER_BEFORE_101100;
     }
     if (version_id >= 100509)
     {
@@ -1565,26 +1570,6 @@ class User_table_json: public User_table
     }
     else // 100501 or earlier
     {
-      /*
-        Address changes in SUPER and REPLICATION SLAVE made in 10.5.2.
-        This also covers a special case: if the user had ALL PRIVILEGES before
-        the upgrade, it gets ALL PRIVILEGES after the upgrade.
-      */
-      if (access & SUPER_ACL)
-      {
-        if (access & REPL_SLAVE_ACL)
-        {
-          /*
-            The user could do both before the upgrade:
-            - set global variables       (because of SUPER_ACL)
-            - execute "SHOW SLAVE HOSTS" (because of REPL_SLAVE_ACL)
-            Grant all new privileges that were splitted from SUPER (in 10.5.2),
-            and REPLICATION MASTER ADMIN, so it still can do "SHOW SLAVE HOSTS".
-          */
-          access|= REPL_MASTER_ADMIN_ACL;
-        }
-        access|= GLOBAL_SUPER_ADDED_SINCE_USER_TABLE_ACLS;
-      }
       /*
         REPLICATION_CLIENT(BINLOG_MONITOR_ACL) should allow SHOW SLAVE STATUS
         REPLICATION SLAVE should allow SHOW RELAYLOG EVENTS
@@ -1707,7 +1692,7 @@ class User_table_json: public User_table
   int set_password_expired (bool x) const
   { return x ? set_password_last_changed(0) : 0; }
 
-  ~User_table_json() {}
+  ~User_table_json() = default;
  private:
   friend class Grant_tables;
   static const uint JSON_SIZE=1024;
@@ -2533,6 +2518,8 @@ bool acl_init(bool dont_read_acl_tables)
     DBUG_RETURN(1); /* purecov: inspected */
   thd->thread_stack= (char*) &thd;
   thd->store_globals();
+  thd->set_query_inner((char*) STRING_WITH_LEN("intern:acl_init"),
+                       default_charset_info);
   /*
     It is safe to call acl_reload() since acl_* arrays and hashes which
     will be freed there are global static objects and thus are initialized
@@ -5411,7 +5398,7 @@ public:
   GRANT_NAME(const char *h, const char *d,const char *u,
              const char *t, privilege_t p, bool is_routine);
   GRANT_NAME (TABLE *form, bool is_routine);
-  virtual ~GRANT_NAME() {};
+  virtual ~GRANT_NAME() = default;
   virtual bool ok() { return privs != NO_ACL; }
   void set_user_details(const char *h, const char *d,
                         const char *u, const char *t,
@@ -8001,6 +7988,9 @@ bool grant_init()
     DBUG_RETURN(1);				/* purecov: deadcode */
   thd->thread_stack= (char*) &thd;
   thd->store_globals();
+  thd->set_query_inner((char*) STRING_WITH_LEN("intern:grant_init"),
+                       default_charset_info);
+
   return_val=  grant_reload(thd);
   delete thd;
   DBUG_RETURN(return_val);
@@ -11741,8 +11731,7 @@ public:
     : is_grave(FALSE)
   {}
 
-  virtual ~Silence_routine_definer_errors()
-  {}
+  virtual ~Silence_routine_definer_errors() = default;
 
   virtual bool handle_condition(THD *thd,
                                 uint sql_errno,
@@ -13307,12 +13296,7 @@ static bool send_server_handshake_packet(MPVIO_EXT *mpvio,
     data_len= SCRAMBLE_LENGTH;
   }
 
-  /* When server version is specified in config file, don't include
-     the replication hack prefix. */
-  if (using_custom_server_version)
-    end= strnmov(end, server_version, SERVER_VERSION_LENGTH) + 1;
-  else
-    end= strxnmov(end, SERVER_VERSION_LENGTH, RPL_VERSION_HACK, server_version, NullS) + 1;
+  end= strnmov(end, server_version, SERVER_VERSION_LENGTH) + 1;
 
   int4store((uchar*) end, mpvio->auth_info.thd->thread_id);
   end+= 4;

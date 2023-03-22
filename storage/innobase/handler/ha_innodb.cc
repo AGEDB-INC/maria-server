@@ -894,43 +894,37 @@ static SHOW_VAR innodb_status_variables[]= {
   (char*) &export_vars.innodb_buffer_pool_resize_status,  SHOW_CHAR},
   {"buffer_pool_load_incomplete",
   &export_vars.innodb_buffer_pool_load_incomplete,        SHOW_BOOL},
-  {"buffer_pool_pages_data",
-   &export_vars.innodb_buffer_pool_pages_data, SHOW_SIZE_T},
+  {"buffer_pool_pages_data", &UT_LIST_GET_LEN(buf_pool.LRU), SHOW_SIZE_T},
   {"buffer_pool_bytes_data",
    &export_vars.innodb_buffer_pool_bytes_data, SHOW_SIZE_T},
   {"buffer_pool_pages_dirty",
-   &export_vars.innodb_buffer_pool_pages_dirty, SHOW_SIZE_T},
-  {"buffer_pool_bytes_dirty",
-   &export_vars.innodb_buffer_pool_bytes_dirty, SHOW_SIZE_T},
-  {"buffer_pool_pages_flushed", &buf_flush_page_count, SHOW_SIZE_T},
-  {"buffer_pool_pages_free",
-   &export_vars.innodb_buffer_pool_pages_free, SHOW_SIZE_T},
+   &UT_LIST_GET_LEN(buf_pool.flush_list), SHOW_SIZE_T},
+  {"buffer_pool_bytes_dirty", &buf_pool.flush_list_bytes, SHOW_SIZE_T},
+  {"buffer_pool_pages_flushed", &buf_pool.stat.n_pages_written, SHOW_SIZE_T},
+  {"buffer_pool_pages_free", &UT_LIST_GET_LEN(buf_pool.free), SHOW_SIZE_T},
 #ifdef UNIV_DEBUG
   {"buffer_pool_pages_latched",
    &export_vars.innodb_buffer_pool_pages_latched, SHOW_SIZE_T},
 #endif /* UNIV_DEBUG */
   {"buffer_pool_pages_made_not_young",
-   &export_vars.innodb_buffer_pool_pages_made_not_young, SHOW_SIZE_T},
+   &buf_pool.stat.n_pages_not_made_young, SHOW_SIZE_T},
   {"buffer_pool_pages_made_young",
-   &export_vars.innodb_buffer_pool_pages_made_young, SHOW_SIZE_T},
+   &buf_pool.stat.n_pages_made_young, SHOW_SIZE_T},
   {"buffer_pool_pages_misc",
    &export_vars.innodb_buffer_pool_pages_misc, SHOW_SIZE_T},
-  {"buffer_pool_pages_old",
-   &export_vars.innodb_buffer_pool_pages_old, SHOW_SIZE_T},
+  {"buffer_pool_pages_old", &buf_pool.LRU_old_len, SHOW_SIZE_T},
   {"buffer_pool_pages_total",
    &export_vars.innodb_buffer_pool_pages_total, SHOW_SIZE_T},
   {"buffer_pool_pages_LRU_flushed", &buf_lru_flush_page_count, SHOW_SIZE_T},
   {"buffer_pool_pages_LRU_freed", &buf_lru_freed_page_count, SHOW_SIZE_T},
+  {"buffer_pool_pages_split", &buf_pool.pages_split, SHOW_SIZE_T},
   {"buffer_pool_read_ahead_rnd",
-   &export_vars.innodb_buffer_pool_read_ahead_rnd, SHOW_SIZE_T},
-  {"buffer_pool_read_ahead",
-   &export_vars.innodb_buffer_pool_read_ahead, SHOW_SIZE_T},
+   &buf_pool.stat.n_ra_pages_read_rnd, SHOW_SIZE_T},
+  {"buffer_pool_read_ahead", &buf_pool.stat.n_ra_pages_read, SHOW_SIZE_T},
   {"buffer_pool_read_ahead_evicted",
-   &export_vars.innodb_buffer_pool_read_ahead_evicted, SHOW_SIZE_T},
-  {"buffer_pool_read_requests",
-   &export_vars.innodb_buffer_pool_read_requests, SHOW_SIZE_T},
-  {"buffer_pool_reads",
-   &export_vars.innodb_buffer_pool_reads, SHOW_SIZE_T},
+   &buf_pool.stat.n_ra_pages_evicted, SHOW_SIZE_T},
+  {"buffer_pool_read_requests", &buf_pool.stat.n_page_gets, SHOW_SIZE_T},
+  {"buffer_pool_reads", &buf_pool.stat.n_pages_read, SHOW_SIZE_T},
   {"buffer_pool_wait_free", &buf_pool.stat.LRU_waits, SHOW_SIZE_T},
   {"buffer_pool_write_requests", &buf_pool.flush_list_requests, SHOW_SIZE_T},
   {"checkpoint_age", &export_vars.innodb_checkpoint_age, SHOW_SIZE_T},
@@ -1491,8 +1485,7 @@ static void innodb_drop_database(handlerton*, char *path)
     mtr_t mtr;
     mtr.start();
     pcur.btr_cur.page_cur.index = sys_index;
-    err= btr_pcur_open_on_user_rec(&tuple, PAGE_CUR_GE,
-                                   BTR_SEARCH_LEAF, &pcur, &mtr);
+    err= btr_pcur_open_on_user_rec(&tuple, BTR_SEARCH_LEAF, &pcur, &mtr);
     if (err != DB_SUCCESS)
       goto err_exit;
 
@@ -2983,10 +2976,8 @@ ha_innobase::ha_innobase(
 /*********************************************************************//**
 Destruct ha_innobase handler. */
 
-ha_innobase::~ha_innobase()
+ha_innobase::~ha_innobase() = default;
 /*======================*/
-{
-}
 
 /*********************************************************************//**
 Updates the user_thd field in a handle and also allocates a new InnoDB
@@ -4020,6 +4011,26 @@ skip_buffering_tweak:
 	DBUG_RETURN(0);
 }
 
+
+/*********************************************************************//**
+Setup costs factors for InnoDB to be able to approximate how many
+ms different opperations takes. See cost functions in handler.h how
+the different variables are used */
+
+static void innobase_update_optimizer_costs(OPTIMIZER_COSTS *costs)
+{
+  /*
+    The following number was found by check_costs.pl when using 1M rows
+    and all rows are cached. See optimizer_costs.txt for details
+  */
+  costs->row_next_find_cost= 0.00007013;
+  costs->row_lookup_cost=    0.00076597;
+  costs->key_next_find_cost= 0.00009900;
+  costs->key_lookup_cost=    0.00079112;
+  costs->row_copy_cost=      0.00006087;
+}
+
+
 /** Initialize the InnoDB storage engine plugin.
 @param[in,out]	p	InnoDB handlerton
 @return error code
@@ -4086,6 +4097,8 @@ static int innodb_init(void* p)
 	/* System Versioning */
 	innobase_hton->prepare_commit_versioned
 		= innodb_prepare_commit_versioned;
+
+        innobase_hton->update_optimizer_costs= innobase_update_optimizer_costs;
 
 	innodb_remember_check_sysvar_funcs();
 
@@ -4412,6 +4425,25 @@ innobase_commit_ordered(
 	DBUG_VOID_RETURN;
 }
 
+/** Mark the end of a statement.
+@param trx transaction
+@return whether an error occurred */
+static bool end_of_statement(trx_t *trx)
+{
+  trx_mark_sql_stat_end(trx);
+  if (UNIV_LIKELY(trx->error_state == DB_SUCCESS))
+    return false;
+
+  trx_savept_t savept;
+  savept.least_undo_no= 0;
+  trx->rollback(&savept);
+  /* MariaDB will roll back the entire transaction. */
+  trx->bulk_insert= false;
+  trx->last_sql_stat_start.least_undo_no= 0;
+  trx->savepoints_discard();
+  return true;
+}
+
 /*****************************************************************//**
 Commits a transaction in an InnoDB database or marks an SQL statement
 ended.
@@ -4488,10 +4520,7 @@ innobase_commit(
 		/* Store the current undo_no of the transaction so that we
 		know where to roll back if we have to roll back the next
 		SQL statement */
-
-		trx_mark_sql_stat_end(trx);
-		if (UNIV_UNLIKELY(trx->error_state != DB_SUCCESS)) {
-			trx_rollback_for_mysql(trx);
+		if (UNIV_UNLIKELY(end_of_statement(trx))) {
 			DBUG_RETURN(1);
 		}
 	}
@@ -5018,13 +5047,11 @@ ha_innobase::index_flags(
 	}
 
 	ulong flags= key == table_share->primary_key
-		? HA_CLUSTERED_INDEX : 0;
+		? HA_CLUSTERED_INDEX : HA_KEYREAD_ONLY | HA_DO_RANGE_FILTER_PUSHDOWN;
 
 	flags |= HA_READ_NEXT | HA_READ_PREV | HA_READ_ORDER
-		| HA_READ_RANGE | HA_KEYREAD_ONLY
-		| HA_DO_INDEX_COND_PUSHDOWN
-		| HA_DO_RANGE_FILTER_PUSHDOWN;
-
+              | HA_READ_RANGE
+              | HA_DO_INDEX_COND_PUSHDOWN;
 	return(flags);
 }
 
@@ -6440,7 +6467,7 @@ innobase_fts_casedn_str(
 	char*		dst,	/*!< in: buffer for result string */
 	size_t		dst_len)/*!< in: buffer size */
 {
-	if (cs->casedn_multiply == 1) {
+	if (cs->casedn_multiply() == 1) {
 		memcpy(dst, src, src_len);
 		dst[src_len] = 0;
 		my_casedn_str(cs, dst);
@@ -7906,6 +7933,7 @@ report_error:
 
 #ifdef WITH_WSREP
 	if (!error_result && trx->is_wsrep()
+	    && !trx->is_bulk_insert()
 	    && wsrep_thd_is_local(m_user_thd)
 	    && !wsrep_thd_ignore_table(m_user_thd)
 	    && !wsrep_consistency_check(m_user_thd)
@@ -9445,6 +9473,11 @@ ha_innobase::ft_init()
 		trx->will_lock = true;
 	}
 
+        /* If there is an FTS scan in progress, stop it */
+        fts_result_t* result =  (reinterpret_cast<NEW_FT_INFO*>(ft_handler))->ft_result;
+        if (result)
+                result->current= NULL;
+
 	DBUG_RETURN(rnd_init(false));
 }
 
@@ -9995,6 +10028,8 @@ wsrep_append_key(
 					(shared, exclusive, semi...) */
 )
 {
+	ut_ad(!trx->is_bulk_insert());
+
 	DBUG_ENTER("wsrep_append_key");
 	DBUG_PRINT("enter",
 		    ("thd: %lu trx: %lld", thd_get_thread_id(thd),
@@ -14285,13 +14320,15 @@ ha_innobase::estimate_rows_upper_bound()
 	DBUG_RETURN((ha_rows) estimate);
 }
 
+
 /*********************************************************************//**
 How many seeks it will take to read through the table. This is to be
 comparable to the number returned by records_in_range so that we can
 decide if we should scan the table or use keys.
 @return estimated time measured in disk seeks */
 
-double
+#ifdef NOT_USED
+IO_AND_CPU_COST
 ha_innobase::scan_time()
 /*====================*/
 {
@@ -14311,24 +14348,28 @@ ha_innobase::scan_time()
 		TODO: This will be further improved to return some approximate
 		estimate but that would also needs pre-population of stats
 		structure. As of now approach is in sync with MyISAM. */
-		return(ulonglong2double(stats.data_file_length) / IO_SIZE + 2);
+          return { (ulonglong2double(stats.data_file_length) / IO_SIZE * DISK_READ_COST), 0.0 };
 	}
 
 	ulint	stat_clustered_index_size;
-
+        IO_AND_CPU_COST cost;
 	ut_a(m_prebuilt->table->stat_initialized);
 
 	stat_clustered_index_size =
 		m_prebuilt->table->stat_clustered_index_size;
 
-	return((double) stat_clustered_index_size);
+        cost.io= (double) stat_clustered_index_size * DISK_READ_COST;
+        cost.cpu= 0;
+	return(cost);
 }
+#endif
 
 /******************************************************************//**
 Calculate the time it takes to read a set of ranges through an index
 This enables us to optimise reads for clustered indexes.
 @return estimated time measured in disk seeks */
 
+#ifdef NOT_USED
 double
 ha_innobase::read_time(
 /*===================*/
@@ -14353,8 +14394,33 @@ ha_innobase::read_time(
 		return(time_for_scan);
 	}
 
-	return(ranges + (double) rows / (double) total_rows * time_for_scan);
+	return(ranges * KEY_LOOKUP_COST + (double) rows / (double) total_rows * time_for_scan);
 }
+
+/******************************************************************//**
+Calculate the time it takes to read a set of rows with primary key.
+*/
+
+IO_AND_CPU_COST
+ha_innobase::rnd_pos_time(ha_rows rows)
+{
+	ha_rows total_rows;
+
+	/* Assume that the read time is proportional to the scan time for all
+	rows + at most one seek per range. */
+
+	IO_AND_CPU_COST	time_for_scan = scan_time();
+
+	if ((total_rows = estimate_rows_upper_bound()) < rows) {
+
+		return(time_for_scan);
+	}
+        double frac= (double) rows + (double) rows / (double) total_rows;
+        time_for_scan.io*= frac;
+        time_for_scan.cpu*= frac;
+	return(time_for_scan);
+}
+#endif
 
 /*********************************************************************//**
 Calculates the key number used inside MySQL for an Innobase index.
@@ -14833,13 +14899,6 @@ ha_innobase::info_low(
 					innodb_rec_per_key(index, j,
 							   stats.records));
 
-				/* Since MySQL seems to favor table scans
-				too much over index searches, we pretend
-				index selectivity is 2 times better than
-				our estimate: */
-
-				rec_per_key_int = rec_per_key_int / 2;
-
 				if (rec_per_key_int == 0) {
 					rec_per_key_int = 1;
 				}
@@ -15099,16 +15158,26 @@ ha_innobase::check(
 		}
 
 		if ((check_opt->flags & T_QUICK) || index->is_corrupted()) {
-		} else if (btr_validate_index(index, m_prebuilt->trx)
-			   != DB_SUCCESS) {
-			is_ok = false;
-			push_warning_printf(thd,
-					    Sql_condition::WARN_LEVEL_WARN,
-					    ER_NOT_KEYFILE,
-					    "InnoDB: The B-tree of"
-					    " index %s is corrupted.",
-					    index->name());
-			continue;
+		} else if (trx_id_t bulk_trx_id =
+				m_prebuilt->table->bulk_trx_id) {
+			if (!m_prebuilt->trx->read_view.changes_visible(
+							bulk_trx_id)) {
+				is_ok = true;
+				goto func_exit;
+			}
+
+			if (btr_validate_index(index, m_prebuilt->trx)
+			    != DB_SUCCESS) {
+				is_ok = false;
+				push_warning_printf(
+					thd,
+					Sql_condition::WARN_LEVEL_WARN,
+					ER_NOT_KEYFILE,
+					"InnoDB: The B-tree of"
+					" index %s is corrupted.",
+					index->name());
+				continue;
+			}
 		}
 
 		/* Instead of invoking change_active_index(), set up
@@ -15231,6 +15300,7 @@ ha_innobase::check(
 	}
 # endif /* defined UNIV_AHI_DEBUG || defined UNIV_DEBUG */
 #endif /* BTR_CUR_HASH_ADAPT */
+func_exit:
 	m_prebuilt->trx->op_info = "";
 
 	DBUG_RETURN(is_ok ? HA_ADMIN_OK : HA_ADMIN_CORRUPT);
@@ -16896,10 +16966,7 @@ innobase_xa_prepare(
 		/* Store the current undo_no of the transaction so that we
 		know where to roll back if we have to roll back the next
 		SQL statement */
-
-		trx_mark_sql_stat_end(trx);
-		if (UNIV_UNLIKELY(trx->error_state != DB_SUCCESS)) {
-			trx_rollback_for_mysql(trx);
+		if (UNIV_UNLIKELY(end_of_statement(trx))) {
 			return 1;
 		}
 	}
@@ -18575,7 +18642,15 @@ void lock_wait_wsrep_kill(trx_t *bf_trx, ulong thd_id, trx_id_t trx_id)
       lock_sys.cancel_lock_wait_for_trx(vtrx);
 
       DEBUG_SYNC(bf_thd, "before_wsrep_thd_abort");
-      wsrep_thd_bf_abort(bf_thd, vthd, true);
+      if (!wsrep_thd_bf_abort(bf_thd, vthd, true))
+      {
+        wsrep_thd_LOCK(vthd);
+        wsrep_thd_set_wsrep_aborter(NULL, vthd);
+        wsrep_thd_UNLOCK(vthd);
+
+        WSREP_DEBUG("wsrep_thd_bf_abort has failed, victim %lu will survive",
+                     thd_get_thread_id(vthd));
+      }
     }
     wsrep_thd_kill_UNLOCK(vthd);
   }
@@ -19035,7 +19110,7 @@ static MYSQL_SYSVAR_BOOL(buffer_pool_load_at_startup, srv_buffer_pool_load_at_st
   NULL, NULL, TRUE);
 
 static MYSQL_SYSVAR_BOOL(defragment, srv_defragment,
-  PLUGIN_VAR_RQCMDARG,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_DEPRECATED,
   "Enable/disable InnoDB defragmentation (default FALSE). When set to FALSE, all existing "
   "defragmentation will be paused. And new defragmentation command will fail."
   "Paused defragmentation commands will resume when this variable is set to "
@@ -19043,14 +19118,14 @@ static MYSQL_SYSVAR_BOOL(defragment, srv_defragment,
   NULL, NULL, FALSE);
 
 static MYSQL_SYSVAR_UINT(defragment_n_pages, srv_defragment_n_pages,
-  PLUGIN_VAR_RQCMDARG,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_DEPRECATED,
   "Number of pages considered at once when merging multiple pages to "
   "defragment",
   NULL, NULL, 7, 2, 32, 0);
 
 static MYSQL_SYSVAR_UINT(defragment_stats_accuracy,
   srv_defragment_stats_accuracy,
-  PLUGIN_VAR_RQCMDARG,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_DEPRECATED,
   "How many defragment stats changes there are before the stats "
   "are written to persistent storage. Set to 0 meaning disable "
   "defragment stats tracking.",
@@ -19058,7 +19133,7 @@ static MYSQL_SYSVAR_UINT(defragment_stats_accuracy,
 
 static MYSQL_SYSVAR_UINT(defragment_fill_factor_n_recs,
   srv_defragment_fill_factor_n_recs,
-  PLUGIN_VAR_RQCMDARG,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_DEPRECATED,
   "How many records of space defragmentation should leave on the page. "
   "This variable, together with innodb_defragment_fill_factor, is introduced "
   "so defragmentation won't pack the page too full and cause page split on "
@@ -19067,7 +19142,7 @@ static MYSQL_SYSVAR_UINT(defragment_fill_factor_n_recs,
   NULL, NULL, 20, 1, 100, 0);
 
 static MYSQL_SYSVAR_DOUBLE(defragment_fill_factor, srv_defragment_fill_factor,
-  PLUGIN_VAR_RQCMDARG,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_DEPRECATED,
   "A number between [0.7, 1] that tells defragmentation how full it should "
   "fill a page. Default is 0.9. Number below 0.7 won't make much sense."
   "This variable, together with innodb_defragment_fill_factor_n_recs, is "
@@ -19077,7 +19152,7 @@ static MYSQL_SYSVAR_DOUBLE(defragment_fill_factor, srv_defragment_fill_factor,
   NULL, NULL, 0.9, 0.7, 1, 0);
 
 static MYSQL_SYSVAR_UINT(defragment_frequency, srv_defragment_frequency,
-  PLUGIN_VAR_RQCMDARG,
+  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_DEPRECATED,
   "Do not defragment a single index more than this number of time per second."
   "This controls the number of time defragmentation thread can request X_LOCK "
   "on an index. Defragmentation thread will check whether "
@@ -19909,6 +19984,7 @@ ha_innobase::multi_range_read_info_const(
 	uint		n_ranges,
 	uint*		bufsz,
 	uint*		flags,
+        ha_rows         limit,
 	Cost_estimate*	cost)
 {
 	/* See comments in ha_myisam::multi_range_read_info_const */
@@ -19918,8 +19994,9 @@ ha_innobase::multi_range_read_info_const(
 		*flags |= HA_MRR_USE_DEFAULT_IMPL;
 	}
 
-	ha_rows res= m_ds_mrr.dsmrr_info_const(keyno, seq, seq_init_param, n_ranges,
-			bufsz, flags, cost);
+	ha_rows res= m_ds_mrr.dsmrr_info_const(keyno, seq, seq_init_param,
+                                               n_ranges,
+                                               bufsz, flags, limit, cost);
 	return res;
 }
 

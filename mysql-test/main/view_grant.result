@@ -22,7 +22,7 @@ grant create view,select on test.* to mysqltest_1@localhost;
 connect  user1,localhost,mysqltest_1,,test;
 connection user1;
 create definer=root@localhost view v1 as select * from mysqltest.t1;
-ERROR 42000: Access denied; you need (at least one of) the SUPER, SET USER privilege(s) for this operation
+ERROR 42000: Access denied; you need (at least one of) the SET USER privilege(s) for this operation
 create view v1 as select * from mysqltest.t1;
 alter view v1 as select * from mysqltest.t1;
 ERROR 42000: DROP command denied to user 'mysqltest_1'@'localhost' for table `test`.`v1`
@@ -415,8 +415,6 @@ create table t2 (s1 int);
 drop function if exists f2;
 create function f2 () returns int begin declare v int; select s1 from t2
 into v; return v; end//
-Warnings:
-Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 create algorithm=TEMPTABLE view v1 as select f2() from t1;
 create algorithm=MERGE view v2 as select f2() from t1;
 create algorithm=TEMPTABLE SQL SECURITY INVOKER view v3 as select f2() from t1;
@@ -459,8 +457,6 @@ create table t2 (s1 int);
 drop function if exists f2;
 create function f2 () returns int begin declare v int; select s1 from t2
 into v; return v; end//
-Warnings:
-Warning	1287	'<select expression> INTO <destination>;' is deprecated and will be removed in a future release. Please use 'SELECT <select list> INTO <destination> FROM...' instead
 create user mysqltest_1@localhost;
 grant select on t1 to mysqltest_1@localhost;
 grant execute on function f2 to mysqltest_1@localhost;
@@ -931,7 +927,7 @@ ERROR 42000: CREATE VIEW command denied to user 'u26813'@'localhost' for table `
 ALTER VIEW v2 AS SELECT f2 FROM t1;
 ERROR 42000: DROP command denied to user 'u26813'@'localhost' for table `db26813`.`v2`
 ALTER VIEW v3 AS SELECT f2 FROM t1;
-ERROR 42000: Access denied; you need (at least one of) the SUPER, SET USER privilege(s) for this operation
+ERROR 42000: Access denied; you need (at least one of) the SET USER privilege(s) for this operation
 connection root;
 SHOW CREATE VIEW v3;
 View	Create View	character_set_client	collation_connection
@@ -959,9 +955,9 @@ GRANT SELECT, DROP, CREATE VIEW, SHOW VIEW ON mysqltest_29908.v2 TO u29908_2@loc
 GRANT SELECT ON mysqltest_29908.t1 TO u29908_2@localhost;
 connect  u2,localhost,u29908_2,,mysqltest_29908;
 ALTER VIEW v1 AS SELECT f2 FROM t1;
-ERROR 42000: Access denied; you need (at least one of) the SUPER, SET USER privilege(s) for this operation
+ERROR 42000: Access denied; you need (at least one of) the SET USER privilege(s) for this operation
 ALTER VIEW v2 AS SELECT f2 FROM t1;
-ERROR 42000: Access denied; you need (at least one of) the SUPER, SET USER privilege(s) for this operation
+ERROR 42000: Access denied; you need (at least one of) the SET USER privilege(s) for this operation
 SHOW CREATE VIEW v2;
 View	Create View	character_set_client	collation_connection
 v2	CREATE ALGORITHM=UNDEFINED DEFINER=`u29908_1`@`localhost` SQL SECURITY INVOKER VIEW `v2` AS select `t1`.`f1` AS `f1` from `t1`	latin1	latin1_swedish_ci

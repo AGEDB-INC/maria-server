@@ -22,6 +22,7 @@ IF(WITH_WSREP AND NOT EMBEDDED_LIBRARY)
     wsrep_server_service.cc
     wsrep_storage_service.cc
     wsrep_server_state.cc
+    wsrep_event_service.cc
     wsrep_status.cc
     wsrep_allowlist_service.cc
     wsrep_utils.cc
@@ -37,7 +38,8 @@ IF(WITH_WSREP AND NOT EMBEDDED_LIBRARY)
     wsrep_schema.cc
     wsrep_plugin.cc
     service_wsrep.cc
-  )
+    )
+  MYSQL_ADD_PLUGIN(wsrep_provider ${WSREP_SOURCES} DEFAULT NOT_EMBEDDED LINK_LIBRARIES wsrep-lib wsrep_api_v26)
   MYSQL_ADD_PLUGIN(wsrep ${WSREP_SOURCES} MANDATORY NOT_EMBEDDED LINK_LIBRARIES wsrep-lib wsrep_api_v26)
   IF(VISIBILITY_HIDDEN_FLAG AND TARGET wsrep)
     # wsrep_info plugin needs some wsrep symbols from inside mysqld
@@ -106,7 +108,6 @@ SET (SQL_SOURCE
                key.cc log.cc lock.cc
                log_event.cc log_event_server.cc
                rpl_record.cc rpl_reporting.cc
-               log_event_old.cc rpl_record_old.cc
                mf_iocache.cc my_decimal.cc
                mysqld.cc net_serv.cc  keycaches.cc
                ../sql-common/client_plugin.c
@@ -174,6 +175,7 @@ SET (SQL_SOURCE
                sql_tvc.cc sql_tvc.h
                opt_split.cc
                rowid_filter.cc rowid_filter.h
+               optimizer_costs.h optimizer_defaults.h
                opt_trace.cc
                table_cache.cc encryption.cc temporary_tables.cc
                json_table.cc
@@ -234,6 +236,15 @@ FOREACH(se aria partition perfschema sql_sequence wsrep)
     TARGET_LINK_LIBRARIES(sql ${se})
   ENDIF()
 ENDFOREACH()
+
+IF(VISIBILITY_HIDDEN_FLAG AND TARGET partition AND WITH_UBSAN)
+  # the spider plugin needs some partition symbols from inside mysqld
+  # when built with ubsan, in which case we need to remove
+  # -fvisibility=hidden from partition
+  GET_TARGET_PROPERTY(f partition COMPILE_FLAGS)
+  STRING(REPLACE "${VISIBILITY_HIDDEN_FLAG}" "" f ${f})
+  SET_TARGET_PROPERTIES(partition PROPERTIES COMPILE_FLAGS "${f}")
+ENDIF()
 
 IF(WIN32)
   SET(MYSQLD_SOURCE main.cc  message.rc)

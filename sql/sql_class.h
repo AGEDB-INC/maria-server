@@ -90,7 +90,6 @@ struct rpl_group_info;
 struct rpl_parallel_thread;
 class Rpl_filter;
 class Query_log_event;
-class Load_log_event;
 class Log_event_writer;
 class sp_rcontext;
 class sp_cache;
@@ -245,6 +244,29 @@ public:
   CHARSET_INFO *charset() const { return cs; }
 
   friend LEX_STRING * thd_query_string (MYSQL_THD thd);
+};
+
+
+class Recreate_info
+{
+  ha_rows m_records_copied;
+  ha_rows m_records_duplicate;
+public:
+  Recreate_info()
+   :m_records_copied(0),
+    m_records_duplicate(0)
+  { }
+  Recreate_info(ha_rows records_copied,
+                ha_rows records_duplicate)
+   :m_records_copied(records_copied),
+    m_records_duplicate(records_duplicate)
+  { }
+  ha_rows records_copied() const { return m_records_copied; }
+  ha_rows records_duplicate() const { return m_records_duplicate; }
+  ha_rows records_processed() const
+  {
+    return m_records_copied + m_records_duplicate;
+  }
 };
 
 
@@ -453,7 +475,7 @@ public:
     invisible(false), without_overlaps(false)
   {}
   Key(const Key &rhs, MEM_ROOT *mem_root);
-  virtual ~Key() {}
+  virtual ~Key() = default;
   /* Equality comparison of keys (ignoring name) */
   friend bool foreign_key_prefix(Key *a, Key *b);
   /**
@@ -662,7 +684,7 @@ typedef struct system_variables
   char* dynamic_variables_ptr;
   uint dynamic_variables_head;    /* largest valid variable offset */
   uint dynamic_variables_size;    /* how many bytes are in use */
-  
+
   ulonglong max_heap_table_size;
   ulonglong tmp_memory_table_size;
   ulonglong tmp_disk_table_size;
@@ -670,7 +692,6 @@ typedef struct system_variables
   ulonglong max_statement_time;
   ulonglong optimizer_switch;
   ulonglong optimizer_trace;
-  ulong optimizer_trace_max_mem_size;
   sql_mode_t sql_mode; ///< which non-standard SQL behaviour should be enabled
   sql_mode_t old_behavior; ///< which old SQL behaviour should be enabled
   ulonglong option_bits; ///< OPTION_xxx constants, e.g. OPTION_PROFILING
@@ -684,6 +705,7 @@ typedef struct system_variables
   ulonglong sortbuff_size;
   ulonglong default_regex_flags;
   ulonglong max_mem_used;
+  ulonglong max_rowid_filter_size;
 
   /**
      Place holders to store Multi-source variables in sys_var.cc during
@@ -692,10 +714,14 @@ typedef struct system_variables
   ulonglong slave_skip_counter;
   ulonglong max_relay_log_size;
 
+  double optimizer_where_cost, optimizer_scan_setup_cost;
+  double long_query_time_double, max_statement_time_double;
+  double sample_percentage;
+
   ha_rows select_limit;
   ha_rows max_join_size;
   ha_rows expensive_subquery_limit;
-  ulong auto_increment_increment, auto_increment_offset;
+
 #ifdef WITH_WSREP
   /*
     Stored values of the auto_increment_increment and auto_increment_offset
@@ -704,11 +730,12 @@ typedef struct system_variables
     original values (which are set by the user) by calculated ones (which
     are based on the cluster size):
   */
+  ulonglong wsrep_gtid_seq_no;
   ulong saved_auto_increment_increment, saved_auto_increment_offset;
   ulong saved_lock_wait_timeout;
-  ulonglong wsrep_gtid_seq_no;
 #endif /* WITH_WSREP */
-  uint eq_range_index_dive_limit;
+
+  ulong auto_increment_increment, auto_increment_offset;
   ulong column_compression_zlib_strategy;
   ulong lock_wait_timeout;
   ulong join_cache_level;
@@ -731,8 +758,8 @@ typedef struct system_variables
   ulong optimizer_search_depth;
   ulong optimizer_selectivity_sampling_limit;
   ulong optimizer_use_condition_selectivity;
+  ulong optimizer_trace_max_mem_size;
   ulong use_stat_tables;
-  double sample_percentage;
   ulong histogram_size;
   ulong histogram_type;
   ulong preload_buff_size;
@@ -762,8 +789,16 @@ typedef struct system_variables
   ulong tx_isolation;
   ulong updatable_views_with_limit;
   ulong alter_algorithm;
-  int max_user_connections;
   ulong server_id;
+  ulong session_track_transaction_info;
+  ulong threadpool_priority;
+  ulong optimizer_max_sel_arg_weight;
+  ulong vers_alter_history;
+
+  /* deadlock detection */
+  ulong wt_timeout_short, wt_deadlock_search_depth_short;
+  ulong wt_timeout_long, wt_deadlock_search_depth_long;
+
   /**
     In slave thread we need to know in behalf of which
     thread the query is being run to replicate temp tables properly
@@ -773,10 +808,18 @@ typedef struct system_variables
      When replicating an event group with GTID, keep these values around so
      slave binlog can receive the same GTID as the original.
   */
-  uint32     gtid_domain_id;
   uint64     gtid_seq_no;
+  uint32     gtid_domain_id;
 
   uint group_concat_max_len;
+  uint eq_range_index_dive_limit;
+  uint idle_transaction_timeout;
+  uint idle_readonly_transaction_timeout;
+  uint idle_write_transaction_timeout;
+  uint column_compression_threshold;
+  uint column_compression_zlib_level;
+  uint in_subquery_conversion_threshold;
+  int max_user_connections;
 
   /**
     Default transaction access mode. READ ONLY (true) or READ WRITE (false).
@@ -796,7 +839,17 @@ typedef struct system_variables
   my_bool binlog_annotate_row_events;
   my_bool binlog_direct_non_trans_update;
   my_bool column_compression_zlib_wrap;
-
+  my_bool sysdate_is_now;
+  my_bool wsrep_on;
+  my_bool wsrep_causal_reads;
+  my_bool wsrep_dirty_reads;
+  my_bool pseudo_slave_mode;
+  my_bool session_track_schema;
+  my_bool session_track_state_change;
+#ifdef USER_VAR_TRACKING
+  my_bool session_track_user_variables;
+#endif // USER_VAR_TRACKING
+  my_bool tcp_nodelay;
   plugin_ref table_plugin;
   plugin_ref tmp_table_plugin;
   plugin_ref enforced_table_plugin;
@@ -822,47 +875,16 @@ typedef struct system_variables
   MY_LOCALE *lc_time_names;
 
   Time_zone *time_zone;
+  char *session_track_system_variables;
 
-  my_bool sysdate_is_now;
-
-  /* deadlock detection */
-  ulong wt_timeout_short, wt_deadlock_search_depth_short;
-  ulong wt_timeout_long, wt_deadlock_search_depth_long;
-
-  my_bool wsrep_on;
-  my_bool wsrep_causal_reads;
-  uint    wsrep_sync_wait;
-  ulong   wsrep_retry_autocommit;
+  /* Some wsrep variables */
   ulonglong wsrep_trx_fragment_size;
+  ulong   wsrep_retry_autocommit;
   ulong   wsrep_trx_fragment_unit;
   ulong   wsrep_OSU_method;
-  my_bool wsrep_dirty_reads;
-  double long_query_time_double, max_statement_time_double;
-
-  my_bool pseudo_slave_mode;
-
-  char *session_track_system_variables;
-  ulong session_track_transaction_info;
-  my_bool session_track_schema;
-  my_bool session_track_state_change;
-#ifdef USER_VAR_TRACKING
-  my_bool session_track_user_variables;
-#endif // USER_VAR_TRACKING
-  my_bool tcp_nodelay;
-
-  ulong threadpool_priority;
-
-  uint idle_transaction_timeout;
-  uint idle_readonly_transaction_timeout;
-  uint idle_write_transaction_timeout;
-  uint column_compression_threshold;
-  uint column_compression_zlib_level;
-  uint in_subquery_conversion_threshold;
-  ulong optimizer_max_sel_arg_weight;
-  ulonglong max_rowid_filter_size;
+  uint    wsrep_sync_wait;
 
   vers_asof_timestamp_t vers_asof_timestamp;
-  ulong vers_alter_history;
   my_bool binlog_alter_two_phase;
 } SV;
 
@@ -953,19 +975,21 @@ typedef struct system_status_var
                                             functions are used */
   ulong feature_dynamic_columns;    /* +1 when creating a dynamic column */
   ulong feature_fulltext;	    /* +1 when MATCH is used */
-  ulong feature_gis;                /* +1 opening a table with GIS features */
-  ulong feature_invisible_columns;     /* +1 opening a table with invisible column */
-  ulong feature_json;		    /* +1 when JSON function appears in the statement */
+  ulong feature_gis;                /* +1 opening table with GIS features */
+  ulong feature_invisible_columns;  /* +1 opening table with invisible column */
+  ulong feature_json;		    /* +1 when JSON function is used */
   ulong feature_locale;		    /* +1 when LOCALE is set */
   ulong feature_subquery;	    /* +1 when subqueries are used */
-  ulong feature_system_versioning;  /* +1 opening a table WITH SYSTEM VERSIONING */
+  ulong feature_system_versioning;  /* +1 opening table WITH SYSTEM VERSIONING */
   ulong feature_application_time_periods;
                                     /* +1 opening a table with application-time period */
-  ulong feature_insert_returning;  /* +1 when INSERT...RETURNING is used */
+  ulong feature_insert_returning;   /* +1 when INSERT...RETURNING is used */
   ulong feature_timezone;	    /* +1 when XPATH is used */
   ulong feature_trigger;	    /* +1 opening a table with triggers */
   ulong feature_xml;		    /* +1 when XPATH is used */
   ulong feature_window_functions;   /* +1 when window functions are used */
+  ulong feature_into_outfile;       /* +1 when INTO OUTFILE is used */
+  ulong feature_into_variable;      /* +1 when INTO VARIABLE is used */
 
   /* From MASTER_GTID_WAIT usage */
   ulong master_gtid_wait_timeouts;          /* Number of timeouts */
@@ -1179,7 +1203,7 @@ public:
   Query_arena() { INIT_ARENA_DBUG_INFO; }
 
   virtual Type type() const;
-  virtual ~Query_arena() {};
+  virtual ~Query_arena() = default;
 
   inline bool is_stmt_prepare() const { return state == STMT_INITIALIZED; }
   inline bool is_stmt_prepare_or_first_sp_execute() const
@@ -1230,7 +1254,7 @@ public:
   Query_arena_memroot() : Query_arena()
   {}
 
-  virtual ~Query_arena_memroot() {}
+  virtual ~Query_arena_memroot() = default;
 };
 
 
@@ -1380,7 +1404,7 @@ public:
   my_bool query_cache_is_applicable;
 
   /* This constructor is called for backup statements */
-  Statement() {}
+  Statement() = default;
 
   Statement(LEX *lex_arg, MEM_ROOT *mem_root_arg,
             enum enum_state state_arg, ulong id_arg);
@@ -1892,7 +1916,7 @@ protected:
     m_prev_internal_handler(NULL)
   {}
 
-  virtual ~Internal_error_handler() {}
+  virtual ~Internal_error_handler() = default;
 
 public:
   /**
@@ -1950,7 +1974,7 @@ public:
     /* Ignore error */
     return TRUE;
   }
-  Dummy_error_handler() {}                    /* Remove gcc warning */
+  Dummy_error_handler() = default;                    /* Remove gcc warning */
 };
 
 
@@ -1987,7 +2011,7 @@ public:
 class Drop_table_error_handler : public Internal_error_handler
 {
 public:
-  Drop_table_error_handler() {}
+  Drop_table_error_handler() = default;
 
 public:
   bool handle_condition(THD *thd,
@@ -2028,7 +2052,7 @@ private:
 class Turn_errors_to_warnings_handler : public Internal_error_handler
 {
 public:
-  Turn_errors_to_warnings_handler() {}
+  Turn_errors_to_warnings_handler() = default;
   bool handle_condition(THD *thd,
                         uint sql_errno,
                         const char* sqlstate,
@@ -2670,6 +2694,7 @@ public:
   struct  system_status_var org_status_var; // For user statistics
   struct  system_status_var *initial_status_var; /* used by show status */
   THR_LOCK_INFO lock_info;              // Locking info of this thread
+
   /**
     Protects THD data accessed from other threads:
     - thd->query and thd->query_length (used by SHOW ENGINE
@@ -3400,7 +3425,7 @@ public:
     Check if the number of rows accessed by a statement exceeded
     LIMIT ROWS EXAMINED. If so, signal the query engine to stop execution.
   */
-  void check_limit_rows_examined()
+  inline void check_limit_rows_examined()
   {
     if (++accessed_rows_and_keys > lex->limit_rows_examined_cnt)
       set_killed(ABORT_QUERY);
@@ -4362,6 +4387,8 @@ public:
   inline bool vio_ok() const { return TRUE; }
   inline bool is_connected() { return TRUE; }
 #endif
+
+   void my_ok_with_recreate_info(const Recreate_info &info, ulong warn_count);
   /**
     Mark the current error as fatal. Warning: this does not
     set any error, it sets a property of the error, so must be
@@ -5257,7 +5284,7 @@ private:
   bool use_temporary_table(TABLE *table, TABLE **out_table);
   void close_temporary_table(TABLE *table);
   bool log_events_and_free_tmp_shares();
-  void free_tmp_table_share(TMP_TABLE_SHARE *share, bool delete_table);
+  bool free_tmp_table_share(TMP_TABLE_SHARE *share, bool delete_table);
   void free_temporary_table(TABLE *table);
   bool lock_temporary_tables();
   void unlock_temporary_tables();
@@ -5725,7 +5752,7 @@ public:
     example for a duplicate row entry written to a temp table.
   */
   virtual int send_data(List<Item> &items)=0;
-  virtual ~select_result_sink() {};
+  virtual ~select_result_sink() = default;
   void reset(THD *thd_arg) { thd= thd_arg; }
 };
 
@@ -5757,7 +5784,7 @@ public:
   ha_rows est_records;  /* estimated number of records in the result */
   select_result(THD *thd_arg): select_result_sink(thd_arg), est_records(0) {}
   void set_unit(SELECT_LEX_UNIT *unit_arg) { unit= unit_arg; }
-  virtual ~select_result() {};
+  virtual ~select_result() = default;
   /**
     Change wrapped select_result.
 
@@ -6245,6 +6272,7 @@ public:
   Item	    **items_to_copy;			/* Fields in tmp table */
   TMP_ENGINE_COLUMNDEF *recinfo, *start_recinfo;
   KEY *keyinfo;
+  ulong *rec_per_key;
   ha_rows end_write_records;
   /**
     Number of normal fields in the query, including those referred to
@@ -6272,8 +6300,15 @@ public:
     @see opt_sum_query, count_field_types
   */
   uint  sum_func_count;   
+  uint  copy_func_count;                        // Allocated copy fields
   uint  hidden_field_count;
   uint	group_parts,group_length,group_null_parts;
+
+  /*
+    If we're doing a GROUP BY operation, shows which one is used:
+    true  TemporaryTableWithPartialSums algorithm (see end_update()).
+    false OrderedGroupBy algorithm (see end_write_group()).
+  */
   uint	quick_group;
   /**
     Enabled when we have atleast one outer_sum_func. Needed when used
@@ -6813,13 +6848,13 @@ public:
   /* 
     Cost to materialize - execute the sub-join and write rows into temp.table
   */
-  Cost_estimate materialization_cost;
+  double materialization_cost;
 
   /* Cost to make one lookup in the temptable */
-  Cost_estimate lookup_cost;
+  double lookup_cost;
   
   /* Cost of scanning the materialized table */
-  Cost_estimate scan_cost;
+  double scan_cost;
 
   /* --- Execution structures ---------- */
   
@@ -6997,7 +7032,7 @@ class user_var_entry
 {
   CHARSET_INFO *m_charset;
  public:
-  user_var_entry() {}                         /* Remove gcc warning */
+  user_var_entry() = default;                         /* Remove gcc warning */
   LEX_CSTRING name;
   char *value;
   size_t length;
@@ -7118,7 +7153,7 @@ public:
   enum type { SESSION_VAR, LOCAL_VAR, PARAM_VAR };
   type scope;
   my_var(const LEX_CSTRING *j, enum type s) : name(*j), scope(s) { }
-  virtual ~my_var() {}
+  virtual ~my_var() = default;
   virtual bool set(THD *thd, Item *val) = 0;
   virtual my_var_sp *get_my_var_sp() { return NULL; }
 };
@@ -7139,7 +7174,7 @@ public:
     : my_var(j, LOCAL_VAR),
       m_rcontext_handler(rcontext_handler),
       m_type_handler(type_handler), offset(o), sp(s) { }
-  ~my_var_sp() { }
+  ~my_var_sp() = default;
   bool set(THD *thd, Item *val);
   my_var_sp *get_my_var_sp() { return this; }
   const Type_handler *type_handler() const
@@ -7169,7 +7204,7 @@ class my_var_user: public my_var {
 public:
   my_var_user(const LEX_CSTRING *j)
     : my_var(j, SESSION_VAR) { }
-  ~my_var_user() { }
+  ~my_var_user() = default;
   bool set(THD *thd, Item *val);
 };
 
@@ -7182,7 +7217,7 @@ public:
   select_dumpvar(THD *thd_arg)
    :select_result_interceptor(thd_arg), row_count(0), m_var_sp_row(NULL)
   { var_list.empty(); }
-  ~select_dumpvar() {}
+  ~select_dumpvar() = default;
   int prepare(List<Item> &list, SELECT_LEX_UNIT *u);
   int send_data(List<Item> &items);
   bool send_eof();
@@ -7408,11 +7443,38 @@ inline void handler::increment_statistics(ulong SSV::*offset) const
   table->in_use->check_limit_rows_examined();
 }
 
+inline void handler::fast_increment_statistics(ulong SSV::*offset) const
+{
+  status_var_increment(table->in_use->status_var.*offset);
+}
+
 inline void handler::decrement_statistics(ulong SSV::*offset) const
 {
   status_var_decrement(table->in_use->status_var.*offset);
 }
 
+/* Update references in the handler to the table */
+
+inline void handler::set_table(TABLE* table_arg)
+{
+  table= table_arg;
+  costs= &table_arg->s->optimizer_costs;
+}
+
+inline bool handler::pk_is_clustering_key(uint index) const
+{
+   /*
+     We have to check for MAX_INDEX as table->s->primary_key can be
+     MAX_KEY in the case where there is no primary key.
+   */
+   return index != MAX_KEY && is_clustering_key(index);
+}
+
+inline bool handler::is_clustering_key(uint index) const
+{
+  DBUG_ASSERT(index != MAX_KEY);
+  return table->is_clustering_key(index);
+}
 
 inline int handler::ha_ft_read(uchar *buf)
 {

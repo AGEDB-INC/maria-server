@@ -87,9 +87,7 @@ class ha_archive final : public handler
 
 public:
   ha_archive(handlerton *hton, TABLE_SHARE *table_arg);
-  ~ha_archive()
-  {
-  }
+  ~ha_archive() = default;
   const char *index_type(uint inx) { return "NONE"; }
   ulonglong table_flags() const
   {
@@ -111,6 +109,10 @@ public:
   uint max_supported_key_length()    const { return sizeof(ulonglong); }
   uint max_supported_key_part_length() const { return sizeof(ulonglong); }
   ha_rows records() { return share->rows_recorded; }
+  IO_AND_CPU_COST scan_time() override;
+  IO_AND_CPU_COST keyread_time(uint index, ulong ranges, ha_rows rows,
+                               ulonglong blocks) override;
+  IO_AND_CPU_COST rnd_pos_time(ha_rows rows) override;
   int index_init(uint keynr, bool sorted);
   virtual int index_read(uchar * buf, const uchar * key,
 			 uint key_len, enum ha_rkey_function find_flag);

@@ -349,8 +349,8 @@ public:
 			<< index->name;
 	}
 
-	/** Descructor */
-	~IndexPurge() UNIV_NOTHROW { }
+	/** Destructor */
+	~IndexPurge() UNIV_NOTHROW = default;
 
 	/** Purge delete marked records.
 	@return DB_SUCCESS or error code. */
@@ -691,7 +691,7 @@ struct FetchIndexRootPages : public AbstractCallback {
 		m_table(table), m_index(0, 0) UNIV_NOTHROW { }
 
 	/** Destructor */
-	~FetchIndexRootPages() UNIV_NOTHROW override { }
+	~FetchIndexRootPages() UNIV_NOTHROW override = default;
 
 	/** Fetch the clustered index root page in the tablespace
 	@param iter	Tablespace iterator
@@ -1617,6 +1617,9 @@ inline dberr_t IndexPurge::purge_pessimistic_delete() noexcept
 dberr_t IndexPurge::purge() noexcept
 {
   btr_pcur_store_position(&m_pcur, &m_mtr);
+  m_mtr.commit();
+  m_mtr.start();
+  m_mtr.set_log_mode(MTR_LOG_NO_REDO);
   dberr_t err= purge_pessimistic_delete();
 
   m_mtr.start();

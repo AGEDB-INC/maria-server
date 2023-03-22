@@ -326,7 +326,7 @@ private:
   TABLE_LIST *save_next_local;
 
 public:
-  Name_resolution_context_state() {}          /* Remove gcc warning */
+  Name_resolution_context_state() = default;          /* Remove gcc warning */
 
 public:
   /* Save the state of a name resolution context. */
@@ -427,7 +427,7 @@ class sp_rcontext;
 class Sp_rcontext_handler
 {
 public:
-  virtual ~Sp_rcontext_handler() {}
+  virtual ~Sp_rcontext_handler() = default;
   /**
     A prefix used for SP variable names in queries:
     - EXPLAIN EXTENDED
@@ -500,8 +500,8 @@ public:
                   required, otherwise we only reading it and SELECT
                   privilege might be required.
   */
-  Settable_routine_parameter() {}
-  virtual ~Settable_routine_parameter() {}
+  Settable_routine_parameter() = default;
+  virtual ~Settable_routine_parameter() = default;
   virtual void set_required_privilege(bool rw) {};
 
   /*
@@ -583,7 +583,7 @@ class Rewritable_query_parameter
       limit_clause_param(false)
   { }
 
-  virtual ~Rewritable_query_parameter() { }
+  virtual ~Rewritable_query_parameter() = default;
 
   virtual bool append_for_log(THD *thd, String *str) = 0;
 };
@@ -743,7 +743,7 @@ public:
 class Item_const
 {
 public:
-  virtual ~Item_const() {}
+  virtual ~Item_const() = default;
   virtual const Type_all_attributes *get_type_all_attributes_from_const() const= 0;
   virtual bool const_is_null() const { return false; }
   virtual const longlong *const_ptr_longlong() const { return NULL; }
@@ -1035,7 +1035,7 @@ public:
 
   LEX_CSTRING name;			/* Name of item */
   /* Original item name (if it was renamed)*/
-  const char *orig_name;
+  LEX_CSTRING orig_name;
 
   /* All common bool variables for an Item is stored here */
   item_base_t base_flags;
@@ -1498,6 +1498,12 @@ public:
     unsigned_flag to check the sign of the item.
   */
   inline ulonglong val_uint() { return (ulonglong) val_int(); }
+
+  virtual bool hash_not_null(Hasher *hasher)
+  {
+    DBUG_ASSERT(0);
+    return true;
+  }
 
   /*
     Return string representation of this item object.
@@ -2103,6 +2109,7 @@ public:
   virtual Item *copy_or_same(THD *thd) { return this; }
   virtual Item *copy_andor_structure(THD *thd) { return this; }
   virtual Item *real_item() { return this; }
+  const Item *real_item() const { return const_cast<Item*>(this)->real_item(); }
   virtual Item *get_tmp_table_item(THD *thd) { return copy_or_same(thd); }
   virtual Item *make_odbc_literal(THD *thd, const LEX_CSTRING *typestr)
   {
@@ -2680,18 +2687,27 @@ public:
   void register_in(THD *thd);	 
   
   bool depends_only_on(table_map view_map) 
-  { return marker & MARKER_FULL_EXTRACTION; }
-  int get_extraction_flag() const
-  { return marker & MARKER_EXTRACTION_MASK; }
+  { return get_extraction_flag() & MARKER_FULL_EXTRACTION; }
+   int get_extraction_flag() const
+  {
+    if (basic_const_item())
+      return MARKER_FULL_EXTRACTION;
+    else
+      return marker & MARKER_EXTRACTION_MASK;
+  }
   void set_extraction_flag(int16 flags)
   {
-    marker &= ~MARKER_EXTRACTION_MASK;
-    marker|= flags;
+    if (!basic_const_item())
+    {
+      marker= marker & ~MARKER_EXTRACTION_MASK;
+      marker|= flags;
+    }
   }
   void clear_extraction_flag()
   {
-    marker &= ~MARKER_EXTRACTION_MASK;
-  }
+    if (!basic_const_item())
+      marker= marker & ~MARKER_EXTRACTION_MASK;
+   }
   void check_pushable_cond(Pushdown_checker excl_dep_func, uchar *arg);
   bool pushable_cond_checker_for_derived(uchar *arg)
   {
@@ -2915,8 +2931,8 @@ class Field_enumerator
 {
 public:
   virtual void visit_field(Item_field *field)= 0;
-  virtual ~Field_enumerator() {};             /* purecov: inspected */
-  Field_enumerator() {}                       /* Remove gcc warning */
+  virtual ~Field_enumerator() = default;;             /* purecov: inspected */
+  Field_enumerator() = default;                       /* Remove gcc warning */
 };
 
 class Item_string;
@@ -3448,7 +3464,7 @@ public:
   Item_result_field(THD *thd, Item_result_field *item):
     Item_fixed_hybrid(thd, item), result_field(item->result_field)
   {}
-  ~Item_result_field() {}			/* Required with gcc 2.95 */
+  ~Item_result_field() = default;
   Field *get_tmp_table_field() override { return result_field; }
   Field *create_tmp_field_ex(MEM_ROOT *root, TABLE *table, Tmp_field_src *src,
                              const Tmp_field_param *param) override
@@ -3690,6 +3706,13 @@ public:
   {
     return Sql_mode_dependency(0, field->value_depends_on_sql_mode());
   }
+  bool hash_not_null(Hasher *hasher) override
+  {
+    if (field->is_null())
+      return true;
+    field->hash_not_null(hasher);
+    return false;
+  }
   longlong val_int_endpoint(bool left_endp, bool *incl_endp) override;
   bool get_date(THD *thd, MYSQL_TIME *ltime, date_mode_t fuzzydate) override;
   bool get_date_result(THD *thd, MYSQL_TIME *ltime,date_mode_t fuzzydate)
@@ -3785,6 +3808,7 @@ public:
   Item_equal *get_item_equal() override { return item_equal; }
   void set_item_equal(Item_equal *item_eq) override { item_equal= item_eq; }
   Item_equal *find_item_equal(COND_EQUAL *cond_equal) override;
+  bool contains(Field *field);
   Item* propagate_equal_fields(THD *, const Context &, COND_EQUAL *) override;
   Item *replace_equal_field(THD *thd, uchar *arg) override;
   uint32 max_display_length() const override
@@ -5580,7 +5604,7 @@ public:
   { return ref ? (*ref)->type() : REF_ITEM; }
   bool eq(const Item *item, bool binary_cmp) const override
   {
-    Item *it= ((Item *) item)->real_item();
+    const Item *it= item->real_item();
     return ref && (*ref)->eq(it, binary_cmp);
   }
   void save_val(Field *to) override;
@@ -5936,7 +5960,7 @@ public:
   { orig_item->make_send_field(thd, field); }
   bool eq(const Item *item, bool binary_cmp) const override
   {
-    Item *it= const_cast<Item*>(item)->real_item();
+    const Item *it= item->real_item();
     return orig_item->eq(it, binary_cmp);
   }
   void fix_after_pullout(st_select_lex *new_parent, Item **refptr, bool merge)
@@ -7697,7 +7721,7 @@ public:
   */
   virtual void close()= 0;
 
-  virtual ~Item_iterator() {}
+  virtual ~Item_iterator() = default;
 };
 
 
@@ -7817,7 +7841,7 @@ public:
   { m_item->make_send_field(thd, field); }
   bool eq(const Item *item, bool binary_cmp) const
   {
-    Item *it= ((Item *) item)->real_item();
+    const Item *it= item->real_item();
     return m_item->eq(it, binary_cmp);
   }
   void fix_after_pullout(st_select_lex *new_parent, Item **refptr, bool merge)

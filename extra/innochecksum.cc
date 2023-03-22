@@ -26,6 +26,8 @@
   Published with a permission.
 */
 
+#define VER "1.0"
+
 #include <my_global.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -771,7 +773,7 @@ parse_page(
 {
 	unsigned long long id;
 	uint16_t undo_page_type;
-	char str[20]={'\0'};
+	const char *str;
 	ulint n_recs;
 	uint32_t page_no, left_page_no, right_page_no;
 	ulint data_bytes;
@@ -779,11 +781,7 @@ parse_page(
 	ulint size_range_id;
 
 	/* Check whether page is doublewrite buffer. */
-	if(skip_page) {
-		strcpy(str, "Double_write_buffer");
-	} else {
-		strcpy(str, "-");
-	}
+	str = skip_page ? "Double_write_buffer" : "-";
 
 	switch (fil_page_get_type(page)) {
 
@@ -1208,20 +1206,6 @@ static struct my_option innochecksum_options[] = {
 
   {0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0}
 };
-
-/** Print out the version and build information. */
-static void print_version()
-{
-#ifdef DBUG_OFF
-	printf("%s Ver %s, for %s (%s)\n",
-		my_progname, PACKAGE_VERSION,
-		SYSTEM_TYPE, MACHINE_TYPE);
-#else
-	printf("%s-debug Ver %s, for %s (%s)\n",
-		my_progname, PACKAGE_VERSION,
-		SYSTEM_TYPE, MACHINE_TYPE);
-#endif /* DBUG_OFF */
-}
 
 static void usage(void)
 {

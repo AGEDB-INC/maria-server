@@ -1402,6 +1402,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "window_functions_computation": {
       "sorts": [
         {
@@ -1416,7 +1417,9 @@ EXPLAIN
             "table": {
               "table_name": "t0",
               "access_type": "ALL",
+              "loops": 1,
               "rows": 10,
+              "cost": "COST_REPLACED",
               "filtered": 100
             }
           }
@@ -1437,6 +1440,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "filesort": {
       "sort_key": "t1.a",
       "window_functions_computation": {
@@ -1453,7 +1457,9 @@ EXPLAIN
               "table": {
                 "table_name": "t1",
                 "access_type": "ALL",
+                "loops": 1,
                 "rows": 10,
+                "cost": "COST_REPLACED",
                 "filtered": 100
               }
             }
@@ -1474,6 +1480,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "window_functions_computation": {
       "sorts": [
         {
@@ -1488,7 +1495,9 @@ EXPLAIN
             "table": {
               "table_name": "t1",
               "access_type": "ALL",
+              "loops": 1,
               "rows": 10,
+              "cost": "COST_REPLACED",
               "filtered": 100
             }
           }
@@ -1511,6 +1520,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "having_condition": "MX in (3,5,7)",
     "filesort": {
       "sort_key": "t1.b",
@@ -1528,7 +1538,9 @@ EXPLAIN
               "table": {
                 "table_name": "t1",
                 "access_type": "ALL",
+                "loops": 1,
                 "rows": 10,
+                "cost": "COST_REPLACED",
                 "filtered": 100
               }
             }
@@ -1665,6 +1677,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "window_functions_computation": {
       "sorts": [
         {
@@ -1679,7 +1692,9 @@ EXPLAIN
             "table": {
               "table_name": "t1",
               "access_type": "ALL",
+              "loops": 1,
               "rows": 3,
+              "cost": "COST_REPLACED",
               "filtered": 100
             }
           }
@@ -1697,6 +1712,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "window_functions_computation": {
       "sorts": [
         {
@@ -1711,7 +1727,9 @@ EXPLAIN
             "table": {
               "table_name": "t1",
               "access_type": "ALL",
+              "loops": 1,
               "rows": 3,
+              "cost": "COST_REPLACED",
               "filtered": 100
             }
           }
@@ -1729,6 +1747,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "window_functions_computation": {
       "sorts": [
         {
@@ -1743,7 +1762,9 @@ EXPLAIN
             "table": {
               "table_name": "t1",
               "access_type": "ALL",
+              "loops": 1,
               "rows": 3,
+              "cost": "COST_REPLACED",
               "filtered": 100
             }
           }
@@ -1761,6 +1782,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "window_functions_computation": {
       "sorts": [
         {
@@ -1775,7 +1797,9 @@ EXPLAIN
             "table": {
               "table_name": "t1",
               "access_type": "ALL",
+              "loops": 1,
               "rows": 3,
+              "cost": "COST_REPLACED",
               "filtered": 100
             }
           }
@@ -1821,6 +1845,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "filesort": {
       "sort_key": "row_number() over ( order by t1.s1,t1.s2) desc",
       "window_functions_computation": {
@@ -1837,7 +1862,9 @@ EXPLAIN
               "table": {
                 "table_name": "t1",
                 "access_type": "ALL",
+                "loops": 1,
                 "rows": 6,
+                "cost": "COST_REPLACED",
                 "filtered": 100
               }
             }
@@ -1981,6 +2008,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "duplicate_removal": {
       "window_functions_computation": {
         "sorts": [
@@ -1996,7 +2024,9 @@ EXPLAIN
               "table": {
                 "table_name": "t1",
                 "access_type": "ALL",
+                "loops": 1,
                 "rows": 9,
+                "cost": "COST_REPLACED",
                 "filtered": 100
               }
             }
@@ -2161,6 +2191,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "window_functions_computation": {
       "sorts": [
         {
@@ -2175,7 +2206,9 @@ EXPLAIN
             "table": {
               "table_name": "t1",
               "access_type": "ALL",
+              "loops": 1,
               "rows": 11,
+              "cost": "COST_REPLACED",
               "filtered": 100
             }
           }
@@ -2228,6 +2261,7 @@ EXPLAIN
 {
   "query_block": {
     "select_id": 1,
+    "cost": "COST_REPLACED",
     "window_functions_computation": {
       "sorts": [
         {
@@ -2242,7 +2276,9 @@ EXPLAIN
             "table": {
               "table_name": "t1",
               "access_type": "ALL",
+              "loops": 1,
               "rows": 6,
+              "cost": "COST_REPLACED",
               "filtered": 100
             }
           }
@@ -3827,6 +3863,7 @@ ANALYZE
   },
   "query_block": {
     "select_id": 1,
+    "cost": "REPLACED",
     "r_loops": 1,
     "r_total_time_ms": "REPLACED",
     "window_functions_computation": {
@@ -3849,9 +3886,11 @@ ANALYZE
             "table": {
               "table_name": "t1",
               "access_type": "ALL",
+              "loops": 1,
               "r_loops": 1,
               "rows": 3,
               "r_rows": 3,
+              "cost": "REPLACED",
               "r_table_time_ms": "REPLACED",
               "r_other_time_ms": "REPLACED",
               "filtered": 100,
@@ -4419,6 +4458,46 @@ pk	a	bit_or
 2	0	18446744073709551615
 DROP TABLE t2;
 DROP TABLE t1;
+#
+# MDEV-15178: Filesort::make_sortorder: Assertion `pos->field != __null |
+#
+CREATE TABLE t1 (i1 int, a int);
+INSERT INTO t1 VALUES (1, 1), (2, 2),(3, 3);
+CREATE TABLE t2 (i2 int);
+INSERT INTO t2 VALUES (1),(2),(5),(1),(7),(4),(3);
+SELECT
+a,
+RANK() OVER (ORDER BY SUM(DISTINCT i1))
+FROM
+t1, t2 WHERE t2.i2 = t1.i1
+GROUP BY
+a;
+a	RANK() OVER (ORDER BY SUM(DISTINCT i1))
+1	1
+2	2
+3	3
+DROP TABLE t1, t2;
+#
+# MDEV-17014: Crash server using ROW_NUMBER() OVER (PARTITION ..)
+#
+CREATE TABLE t1 (UID BIGINT);
+CREATE TABLE t2 (UID BIGINT);
+CREATE TABLE t3 (UID BIGINT);
+insert into t1 VALUES (1),(2);
+insert into t2 VALUES (1),(2);
+insert into t3 VALUES (1),(2);
+SELECT
+ROW_NUMBER() OVER (PARTITION BY GROUP_CONCAT(TT1.UID))
+FROM t1 TT1,
+t2 TT2,
+t3 TT3
+WHERE TT3.UID = TT1.UID AND TT2.UID = TT3.UID
+GROUP BY TT1.UID
+;
+ROW_NUMBER() OVER (PARTITION BY GROUP_CONCAT(TT1.UID))
+1
+1
+DROP TABLE t1, t2, t3;
 #
 # End of 10.3 tests
 #

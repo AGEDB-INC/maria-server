@@ -28,9 +28,7 @@ C_MODE_START
 #include <m_ctype.h>                    /* for CHARSET_INFO */
 #include <stdarg.h>
 #include <typelib.h>
-#ifdef _WIN32
-#include <malloc.h> /*for alloca*/
-#endif
+#include <my_alloca.h>
 #include <mysql/plugin.h>
 #include <mysql/service_my_print_error.h>
 
@@ -195,16 +193,6 @@ my_bool my_test_if_thinly_provisioned(File handle);
 extern my_bool my_may_have_atomic_write;
 
 #if defined(HAVE_ALLOCA) && !defined(HAVE_valgrind)
-#if defined(_AIX) && !defined(__GNUC__) && !defined(_AIX43)
-#pragma alloca
-#endif /* _AIX */
-#if defined(__MWERKS__)
-#undef alloca
-#define alloca _alloca
-#endif /* __MWERKS__ */
-#if defined(__GNUC__) && !defined(HAVE_ALLOCA_H) && ! defined(alloca)
-#define alloca __builtin_alloca
-#endif /* GNUC */
 #define my_alloca(SZ) alloca((size_t) (SZ))
 #define my_afree(PTR) ((void)0)
 #define MAX_ALLOCA_SZ 4096
@@ -352,6 +340,14 @@ typedef struct st_dynamic_array
   PSI_memory_key m_psi_key;
   myf malloc_flags;
 } DYNAMIC_ARRAY;
+
+
+typedef struct st_dynamic_array_append
+{
+  DYNAMIC_ARRAY *array;
+  uchar *pos, *end;
+} DYNAMIC_ARRAY_APPEND;
+
 
 typedef struct st_my_tmpdir
 {
@@ -782,7 +778,7 @@ extern int flush_write_cache(RECORD_CACHE *info);
 extern void handle_recived_signals(void);
 
 extern sig_handler my_set_alarm_variable(int signo);
-extern my_bool radixsort_is_appliccable(uint n_items, size_t size_of_element);
+extern my_bool radixsort_is_applicable(uint n_items, size_t size_of_element);
 extern void my_string_ptr_sort(uchar *base,uint items,size_t size);
 extern void radixsort_for_str_ptr(uchar* base[], uint number_of_elements,
 				  size_t size_of_element,uchar *buffer[]);
@@ -856,6 +852,10 @@ extern void freeze_size(DYNAMIC_ARRAY *array);
 #define push_dynamic(A,B) insert_dynamic((A),(B))
 #define reset_dynamic(array) ((array)->elements= 0)
 #define sort_dynamic(A,cmp) my_qsort((A)->buffer, (A)->elements, (A)->size_of_element, (cmp))
+extern void init_append_dynamic(DYNAMIC_ARRAY_APPEND *append,
+                                DYNAMIC_ARRAY *array);
+extern my_bool append_dynamic(DYNAMIC_ARRAY_APPEND *append,
+                              const void * element);
 
 extern my_bool init_dynamic_string(DYNAMIC_STRING *str, const char *init_str,
 				   size_t init_alloc,size_t alloc_increment);

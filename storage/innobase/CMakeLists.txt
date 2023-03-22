@@ -75,12 +75,6 @@ IF(WITH_INNODB_EXTRA_DEBUG)
 ENDIF()
 ADD_FEATURE_INFO(INNODB_EXTRA_DEBUG WITH_INNODB_EXTRA_DEBUG "Extra InnoDB debug checks")
 
-
-CHECK_FUNCTION_EXISTS(sched_getcpu  HAVE_SCHED_GETCPU)
-IF(HAVE_SCHED_GETCPU)
- ADD_DEFINITIONS(-DHAVE_SCHED_GETCPU=1)
-ENDIF()
-
 IF(HAVE_FALLOC_PUNCH_HOLE_AND_KEEP_SIZE)
  ADD_DEFINITIONS(-DHAVE_FALLOC_PUNCH_HOLE_AND_KEEP_SIZE=1)
 ENDIF()
@@ -331,12 +325,14 @@ SET(INNOBASE_SOURCES
 	include/row0upd.inl
 	include/row0vers.h
 	include/rw_lock.h
+	include/small_vector.h
 	include/srv0mon.h
 	include/srv0mon.inl
 	include/srv0srv.h
 	include/srv0start.h
 	include/srw_lock.h
 	include/sux_lock.h
+	include/transactional_lock_guard.h
 	include/trx0i_s.h
 	include/trx0purge.h
 	include/trx0rec.h

@@ -330,13 +330,6 @@ C_MODE_END
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#if defined(__cplusplus) && defined(NO_CPLUSPLUS_ALLOCA)
-#undef HAVE_ALLOCA
-#undef HAVE_ALLOCA_H
-#endif
-#ifdef HAVE_ALLOCA_H
-#include <alloca.h>
-#endif
 
 #include <errno.h>				/* Recommended by debian */
 /* We need the following to go around a problem with openssl on solaris */
@@ -493,6 +486,7 @@ typedef unsigned short ushort;
 #endif
 
 #include <my_compiler.h>
+#include <my_alloca.h>
 
 /*
   Wen using the embedded library, users might run into link problems,
@@ -682,6 +676,7 @@ typedef SOCKET_SIZE_TYPE size_socket;
   Io buffer size; Must be a power of 2 and a multiple of 512. May be
   smaller what the disk page size. This influences the speed of the
   isam btree library. eg to big to slow.
+  4096 is a common block size on SSDs.
 */
 #define IO_SIZE			4096U
 /*

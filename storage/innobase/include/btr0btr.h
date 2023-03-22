@@ -214,13 +214,12 @@ btr_write_autoinc(dict_index_t* index, ib_uint64_t autoinc, bool reset = false)
 @param[in,out]	mtr	mini-transaction */
 void btr_set_instant(buf_block_t* root, const dict_index_t& index, mtr_t* mtr);
 
-ATTRIBUTE_COLD __attribute__((nonnull, warn_unused_result))
+ATTRIBUTE_COLD __attribute__((nonnull))
 /** Reset the table to the canonical format on ROLLBACK of instant ALTER TABLE.
 @param[in]      index   clustered index with instant ALTER TABLE
 @param[in]      all     whether to reset FIL_PAGE_TYPE as well
-@param[in,out]  mtr     mini-transaction
-@return error code */
-dberr_t btr_reset_instant(const dict_index_t &index, bool all, mtr_t *mtr);
+@param[in,out]  mtr     mini-transaction */
+void btr_reset_instant(const dict_index_t &index, bool all, mtr_t *mtr);
 
 /*************************************************************//**
 Makes tree one level higher by splitting the root, and inserts
@@ -244,7 +243,7 @@ btr_root_raise_and_insert(
 	ulint		n_ext,	/*!< in: number of externally stored columns */
 	mtr_t*		mtr,	/*!< in: mtr */
 	dberr_t*	err)	/*!< out: error code */
-	MY_ATTRIBUTE((warn_unused_result));
+	MY_ATTRIBUTE((nonnull, warn_unused_result));
 /** Reorganize an index page.
 @param cursor  page cursor
 @param mtr     mini-transaction
@@ -442,7 +441,7 @@ Gets the root node of a tree and x- or s-latches it.
 buf_block_t*
 btr_root_block_get(
 /*===============*/
-	const dict_index_t*	index,	/*!< in: index tree */
+	dict_index_t*		index,	/*!< in: index tree */
 	rw_lock_type_t		mode,	/*!< in: either RW_S_LATCH
 					or RW_X_LATCH */
 	mtr_t*			mtr,	/*!< in: mtr */

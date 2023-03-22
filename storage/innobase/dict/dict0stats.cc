@@ -1475,7 +1475,7 @@ invalid:
 			goto invalid;
 		}
 
-		mtr.s_lock_space(index->table->space);
+		mtr.x_lock_space(index->table->space);
 
 		ulint dummy, size;
 		index->stat_index_size
@@ -1677,7 +1677,7 @@ static dberr_t page_cur_open_level(page_cur_t *page_cur, ulint level,
 static dberr_t btr_pcur_open_level(btr_pcur_t *pcur, ulint level, mtr_t *mtr,
                                    dict_index_t *index)
 {
-  pcur->latch_mode= BTR_SEARCH_TREE;
+  pcur->latch_mode= BTR_SEARCH_LEAF;
   pcur->search_mode= PAGE_CUR_G;
   pcur->pos_state= BTR_PCUR_IS_POSITIONED;
   pcur->btr_cur.page_cur.index= index;
@@ -2674,7 +2674,7 @@ empty_index:
 	}
 
 	uint16_t root_level = btr_page_get_level(root->page.frame);
-	mtr.s_lock_space(index->table->space);
+	mtr.x_lock_space(index->table->space);
 	ulint dummy, size;
 	result.index_size
 		= fseg_n_reserved_pages(*root, PAGE_HEADER + PAGE_BTR_SEG_LEAF
@@ -2984,6 +2984,7 @@ dict_stats_update_persistent(
 	index_stats_t stats = dict_stats_analyze_index(index);
 
 	if (stats.is_bulk_operation()) {
+		dict_stats_empty_table(table, false);
 		return DB_SUCCESS_LOCKED_REC;
 	}
 
@@ -3023,6 +3024,12 @@ dict_stats_update_persistent(
 		table->stats_mutex_unlock();
 		stats = dict_stats_analyze_index(index);
 		table->stats_mutex_lock();
+
+		if (stats.is_bulk_operation()) {
+			table->stats_mutex_unlock();
+			dict_stats_empty_table(table, false);
+			return DB_SUCCESS_LOCKED_REC;
+		}
 
 		index->stat_index_size = stats.index_size;
 		index->stat_n_leaf_pages = stats.n_leaf_pages;

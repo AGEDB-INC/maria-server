@@ -218,10 +218,6 @@ in the buffer cache and accessed sequentially for InnoDB to trigger a
 readahead request. */
 ulong	srv_read_ahead_threshold;
 
-/** innodb_change_buffer_max_size; maximum on-disk size of change
-buffer in terms of percentage of the buffer pool. */
-uint	srv_change_buffer_max_size;
-
 /** copy of innodb_open_files; @see innodb_init_params() */
 ulint	srv_max_n_open_files;
 
@@ -388,17 +384,6 @@ time when the last flush of log file has happened. The master
 thread ensures that we flush the log files at least once per
 second. */
 static time_t	srv_last_log_flush_time;
-
-/* Interval in seconds at which various tasks are performed by the
-master thread when server is active. In order to balance the workload,
-we should try to keep intervals such that they are not multiple of
-each other. For example, if we have intervals for various tasks
-defined as 5, 10, 15, 60 then all tasks will be performed when
-current_time % 60 == 0 and no tasks will be performed when
-current_time % 5 != 0. */
-
-# define	SRV_MASTER_CHECKPOINT_INTERVAL		(7)
-# define	SRV_MASTER_DICT_LRU_INTERVAL		(47)
 
 /** Buffer pool dump status frequence in percentages */
 ulong srv_buf_dump_status_frequency;
@@ -659,6 +644,7 @@ void srv_boot()
   if (transactional_lock_enabled())
     sql_print_information("InnoDB: Using transactional memory");
 #endif
+  buf_dblwr.init();
   srv_thread_pool_init();
   trx_pool_init();
   srv_init();
@@ -911,55 +897,18 @@ srv_export_innodb_status(void)
 
 	export_vars.innodb_data_writes = os_n_file_writes;
 
-	ulint dblwr = 0;
-
-	if (buf_dblwr.is_initialised()) {
-		buf_dblwr.lock();
-		dblwr = buf_dblwr.submitted();
-		export_vars.innodb_dblwr_pages_written = buf_dblwr.written();
-		export_vars.innodb_dblwr_writes = buf_dblwr.batches();
-		buf_dblwr.unlock();
-	}
+	buf_dblwr.lock();
+	ulint dblwr = buf_dblwr.submitted();
+	export_vars.innodb_dblwr_pages_written = buf_dblwr.written();
+	export_vars.innodb_dblwr_writes = buf_dblwr.batches();
+	buf_dblwr.unlock();
 
 	export_vars.innodb_data_written = srv_stats.data_written + dblwr;
-
-	export_vars.innodb_buffer_pool_read_requests
-		= buf_pool.stat.n_page_gets;
-
-	export_vars.innodb_buffer_pool_reads = srv_stats.buf_pool_reads;
-
-	export_vars.innodb_buffer_pool_read_ahead_rnd =
-		buf_pool.stat.n_ra_pages_read_rnd;
-
-	export_vars.innodb_buffer_pool_read_ahead =
-		buf_pool.stat.n_ra_pages_read;
-
-	export_vars.innodb_buffer_pool_read_ahead_evicted =
-		buf_pool.stat.n_ra_pages_evicted;
-
-	export_vars.innodb_buffer_pool_pages_data =
-		UT_LIST_GET_LEN(buf_pool.LRU);
 
 	export_vars.innodb_buffer_pool_bytes_data =
 		buf_pool.stat.LRU_bytes
 		+ (UT_LIST_GET_LEN(buf_pool.unzip_LRU)
 		   << srv_page_size_shift);
-
-	export_vars.innodb_buffer_pool_pages_dirty =
-		UT_LIST_GET_LEN(buf_pool.flush_list);
-
-	export_vars.innodb_buffer_pool_pages_made_young
-		= buf_pool.stat.n_pages_made_young;
-	export_vars.innodb_buffer_pool_pages_made_not_young
-		= buf_pool.stat.n_pages_not_made_young;
-
-	export_vars.innodb_buffer_pool_pages_old = buf_pool.LRU_old_len;
-
-	export_vars.innodb_buffer_pool_bytes_dirty =
-		buf_pool.stat.flush_list_bytes;
-
-	export_vars.innodb_buffer_pool_pages_free =
-		UT_LIST_GET_LEN(buf_pool.free);
 
 #ifdef UNIV_DEBUG
 	export_vars.innodb_buffer_pool_pages_latched =
@@ -1342,7 +1291,7 @@ static void srv_master_do_active_tasks(ulonglong counter_time)
 
 	MONITOR_INC(MONITOR_MASTER_ACTIVE_LOOPS);
 
-	if (!(counter_time % (SRV_MASTER_DICT_LRU_INTERVAL * 1000000ULL))) {
+	if (!(counter_time % (47 * 1000000ULL))) {
 		srv_main_thread_op_info = "enforcing dict cache limit";
 		if (ulint n_evicted = dict_sys.evict_table_LRU(true)) {
 			MONITOR_INC_VALUE(
