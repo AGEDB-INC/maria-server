@@ -1,13 +1,18 @@
 # Build and Debug from source (Ubuntu 22.04)
 
 ## Install Dependencies
+You need to check your Ubuntu version to proceed. Note that the configuration is valid for the mariadb branch 11.0 and Ubuntu 22.04. Enter the following command in the terminal to check Ubuntu version.
+```
+lsb_release -a
+```
+
 Firstly Create configuration file in this path '/etc/apt/sources.list.d/mariadb.list` using following command:
 
 ```
 sudo gedit /etc/apt/sources.list.d/mariadb.list
 ```
 
-then Save the following repository configuration contents in the file `/etc/apt/sources.list.d/mariadb.list`. Note that the configuration is valid for the mariadb branch 11.0 and Ubuntu 22.04:
+then Save the following repository configuration contents in the file `/etc/apt/sources.list.d/mariadb.list`. 
 ```
 # Retrieved from: https://mariadb.org/download/?t=repo-config
 
