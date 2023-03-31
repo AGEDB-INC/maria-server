@@ -41,3 +41,67 @@ For instance,
 	                SELECT 0b1000001+0 will return the integer value 65.
                     
 Binary literals are useful in situations where binary strings need to be represented explicitly in a query. They are particularly useful in conjunction with the BIT data type.
+
+## Boolean Literals
+* In MariaDB, FALSE is equivalent to 0 and TRUE is equivalent to 1.
+* These constants are not case-sensitive, so TRUE, True, and true all mean the same thing.
+* When used with the IS operator, TRUE and FALSE are not synonyms of 1 and 0. For example, the expression 10 IS TRUE would return 1, but the expression 10 = * TRUE would return 0 because 1 is not equal to 10.
+* The IS operator also accepts a third constant: UNKNOWN, which is always a synonym for NULL.
+* While TRUE and FALSE are reserved words in MariaDB, UNKNOWN is not.
+In general, it's important to be aware of these when working with Boolean expressions in MariaDB to avoid unexpected results.
+
+## Date and Time Literals
+
+#### How to use Date and Time literals in MariaDB
+MariaDB supports the standard SQL syntax and ODBC syntax for defining Date, Time, and DateTime literals. These literals are useful for inserting and updating date and time values in tables, and for comparing dates and times in queries.
+
+#### Date Literals
+A Date literal is a string that represents a date value in the format 'YYYY-MM-DD' or 'YY-MM-DD'. You can use any punctuation character as a delimiter, but all delimiters must consist of one character. Different delimiters can be used in the same string, and delimiters are optional. A date literal can also be an integer in the format 
+* YYYYMMDD or 
+* YYMMDD.
+
+For example, the following date literals are all valid and represent the same value:
+* '1994-01-01' 
+* '94/01/01' 
+* '1994-01/01' 
+* 19940101
+
+#### DateTime Literals
+A DateTime literal is a string that represents a date and time value in the format 'YYYY-MM-DD HH:MM:SS' or 'YY-MM-DD HH:MM:SS'. You can use any punctuation character as a delimiter for the date part and time part, but all delimiters must consist of one character. Different delimiters can be used in the same string, and delimiters are mandatory. The delimiter between the date part and time part can be a T or any sequence of space characters.
+A DateTime literal can also be an integer in the format 
+* YYYYMMDDHHMMSS
+* YYMMDDHHMMSS
+* YYYYMMDD 
+* YYMMDD. 
+
+In this case, all the time subparts must consist of two digits.
+For example, the following DateTime literals are all valid and represent the same value:
+* '1994-01-01T12:30:03' 
+* '1994/01/01\n\t 12+30+03'
+* '1994/01\01\n\t 12+30-03'
+
+
+#### Time Literals
+A Time literal is a string that represents a time value in the format 'D HH:MM:SS', 'HH:MM:SS, 'D HH:MM', 'HH:MM', 'D HH', or 'SS'. D is a value from 0 to 34 which represents days. The only allowed delimiter for Time literals is ':', and delimiters are mandatory except in the 'HHMMSS' format.
+A Time literal can also be an integer in the format HHMMSS, MMSS, or SS.
+For example, the following Time literals are all valid and represent the same value:
+* '09:05:00' 
+* '9:05:0' 
+* '9:5:0' 
+* '090500'
+
+#### Special Values
+MariaDB allows some special values for date and time literals, such as '0000-00-00' for Date, '00:00:00' for Time, and '0000-00-00 00:00:00' for DateTime. These values are only allowed if the SQL_MODE NO_ZERO_DATE flag is not set.
+If the ALLOW_INVALID_DATES flag is set, invalid dates such as '30th February' are allowed. Otherwise, if the NO_ZERO_DATE flag is set, an error is produced, and if not, a zero-date is returned.
+
+By understanding the syntax and format of Date and Time literals, you can efficiently work with date and time values in MariaDB.
+
+## Hexadecimal Literals
+Hexadecimal literals are a way to represent values using base-16 numbers, where each digit can range from 0 to 9 or from A to F. This notation can be used to represent characters as binary strings or to represent integers in a numeric context.
+
+In MariaDB, there are three ways to write hexadecimal literals: x'value', X'value', and 0xvalue. The first two are SQL standard syntaxes, while the last one is a MySQL/MariaDB extension. The first two syntaxes always behave as a string, while the last one behaves as a string or as a number depending on context. It's important to note that hexadecimal literals can't be decimal numbers.
+
+When used in a numeric context, hexadecimal literals are interpreted as integers. For example, the expression "0xF" represents the integer value 15. In a string context, they are interpreted as binary strings, where each pair of digits represents a character. For example, the expression "x'61'" represents the character 'a'.
+
+In some cases, there can be differences between MariaDB and MySQL when dealing with hexadecimal literals. For example, the expression "x'0a'+0" returns 0 in MariaDB and 10 in MySQL. This is because MariaDB treats hexadecimal literals in a string context, while MySQL treats them as numbers.
+Overall, hexadecimal literals are a useful notation for representing values in a compact and readable way, but it's important to be aware of their behavior in different contexts and between different database systems.
