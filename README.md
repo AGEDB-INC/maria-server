@@ -234,3 +234,18 @@ git clean -xffd && git submodule foreach --recursive git clean -xffd
 ```
 
 Then, follow all the previous steps from the beginning.
+
+## RESEARCH for OQGraph
+
+### What is OQGraph?
+OQGraph is a storage engine for MariaDB that is designed specifically for storing and querying graphs. It allows you to store graph data directly in the database and perform complex graph queries using SQL syntax.
+
+OQGraph is based on the property graph model, which means that each vertex and edge in the graph can have arbitrary properties attached to it. This makes it a flexible model that can be used to represent a wide variety of data. OQGraph is also highly optimized for both storage and query performance, using the Boost Graph Library (BGL) to achieve this.
+
+### How does OQGraph work?
+OQGraph stores graph data in a set of tables optimized for efficient storage and retrieval. Vertices are stored in a separate table, with their properties stored as columns in the table. Edges are stored in a separate table, with each row representing a single edge in the graph. Each edge has a source vertex and a destination vertex, represented as foreign keys to the vertex table.
+
+OQGraph uses recursive common table expressions (CTEs) to perform graph traversal queries. A CTE is a temporary result set that is defined within the execution of a single SQL statement. The recursive CTE in OQGraph allows queries to traverse the graph by repeatedly joining the edge table to itself, building up a path from the starting vertex to the desired destination vertex.
+
+### Using OQGraph
+To use OQGraph, you first need to create tables to store your graph data. You can then specify the OQGRAPH engine for the table that will store the edges of the graph. Once your tables are set up, you can write SQL queries that use CTEs to traverse the graph and retrieve the desired data.
