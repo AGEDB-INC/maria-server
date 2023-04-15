@@ -85,3 +85,19 @@ For example, the following Time literals are all valid and represent the same va
 MariaDB allows some special values for date and time literals, such as '0000-00-00' for Date, '00:00:00' for Time, and '0000-00-00 00:00:00' for DateTime. These values are only allowed if the SQL_MODE NO_ZERO_DATE flag is not set.
 If the ALLOW_INVALID_DATES flag is set, invalid dates such as '30th February' are allowed. Otherwise, if the NO_ZERO_DATE flag is set, an error is produced, and if not, a zero-date is returned.
 By understanding the syntax and format of Date and Time literals, you can efficiently work with date and time values in MariaDB.
+
+## Hexadecimal Literals
+
+Hexadecimal literals are a way to represent values using base-16 numbers, where each digit can range from 0 to 9 or from A to F. This notation can be used to represent characters as binary strings or to represent integers in a numeric context.
+
+In MariaDB, there are three ways to write hexadecimal literals:
+* x'value'
+* X'value' and
+* 0xvalue. 
+
+The first two are SQL standard syntaxes, while the last one is a MySQL/MariaDB extension. The first two syntaxes always behave as a string, while the last one behaves as a string or as a number depending on context. It's important to note that hexadecimal literals can't be decimal numbers.
+
+When used in a numeric context, hexadecimal literals are interpreted as integers. For example, the expression "0xF" represents the integer value 15. In a string context, they are interpreted as binary strings, where each pair of digits represents a character. For example, the expression "x'61'" represents the character 'a'.
+
+In some cases, there can be differences between MariaDB and MySQL when dealing with hexadecimal literals. For example, the expression "x'0a'+0" returns 0 in MariaDB and 10 in MySQL. This is because MariaDB treats hexadecimal literals in a string context, while MySQL treats them as numbers.
+Overall, hexadecimal literals are a useful notation for representing values in a compact and readable way, but it's important to be aware of their behavior in different contexts and between different database systems.
