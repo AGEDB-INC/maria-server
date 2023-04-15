@@ -243,7 +243,9 @@ Buffer pool is an in-memory cache used for faster access to frequently accessed 
 
 ### Working of Buffer Pool
 
-Buffer pool mechanism works on the the two sublist concepts the **new sublist** and the **old sublist** where every item when accessed first time gets on the top of old sublist and on being called while in the old sublist moves to the top of new sublist. By default **37%** of space is reserved for old-block.
+Buffer pool mechanism works on the the two sublist concepts the **new sublist** and the **old sublist** where every item when accessed first time gets on the top of old sublist and on being called while in the old sublist moves to the top of new sublist. By default **37%** of space is reserved for old-block. 
+
+The mechanism of moving tuples out of the new sublist and old sublist is same as both of them works on the LRU algorithm. Once the block moves from old sublist to the head of new sublist then all the previously present blocks in new sublist move one step below and if the new sublist reaches its capacity then the least recently used block from new sublist moves to the head of old sublist.
 
 ### Size of Buffer Pool
 
