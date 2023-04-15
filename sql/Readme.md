@@ -101,3 +101,20 @@ When used in a numeric context, hexadecimal literals are interpreted as integers
 
 In some cases, there can be differences between MariaDB and MySQL when dealing with hexadecimal literals. For example, the expression "x'0a'+0" returns 0 in MariaDB and 10 in MySQL. This is because MariaDB treats hexadecimal literals in a string context, while MySQL treats them as numbers.
 Overall, hexadecimal literals are a useful notation for representing values in a compact and readable way, but it's important to be aware of their behavior in different contexts and between different database systems.
+
+## Identifier Qualifiers
+
+In SQL, identifiers are used to reference data structures such as databases, tables, or columns. Qualifiers are used to specify the context within which the final identifier is interpreted. Let's take a closer look at how identifier qualifiers work in SQL.
+* Qualifiers for Databases When referencing a database, only the database identifier needs to be specified. For example, "db_name" is a valid qualifier for a database. If no database is specified, the current database is assumed. However, if there is no default database and no database is specified, an error is issued.
+
+* Qualifiers for Objects within Databases For objects such as tables, views, functions, etc. that are contained within a database, the database identifier can be specified. If no database is specified, the current database is assumed. It's important to note that the database identifier is optional for objects within the current database.
+
+* Qualifiers for Column Names For column names, the table and the database are generally obvious from the context of the statement. However, it is possible to specify the table identifier or the database identifier plus the table identifier. For example, "db_name.tbl_name.col_name" is a fully-qualified identifier that specifies the database, table, and column names.
+
+* Quoting and Spacing All identifiers can be quoted individually using backticks (`) or other quote characters, if needed. Extra spacing, including new lines and tabs, is allowed between identifiers and qualifiers for readability.
+
+* Dot (.) as Separator If a qualifier is composed of more than one identifier, a dot (.) must be used as a separator. For example, "db_name.tbl_name" uses a dot as a separator between the database and table identifiers. It's important to use the dot as a separator for correct interpretation of qualifiers.
+
+* Dot (.) for Default Database In some cases, a table identifier may be prefixed with a dot (.) for ODBC compliance, but this has no practical effect on MariaDB. It is equivalent to just specifying the table name without the dot. For example, "tbl_name" is equivalent to ".tbl_name" or ".tbl_name".
+
+Understanding how identifier qualifiers work in SQL is crucial for correctly referencing databases, tables, and columns in SQL statements. By using the appropriate qualifiers and following the correct syntax, you can ensure accurate interpretation of identifiers in your SQL queries.
