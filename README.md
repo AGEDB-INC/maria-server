@@ -234,3 +234,35 @@ git clean -xffd && git submodule foreach --recursive git clean -xffd
 ```
 
 Then, follow all the previous steps from the beginning.
+
+## Insert Command
+
+The INSERT statement is used in MariaDB to add new data into a table. The basic syntax of the INSERT statement is as follows:
+```
+INSERT INTO table_name (column1, column2, column3, ...) VALUES (value1, value2, value3, ...);
+```
+
+For example, if you have a table called students with columns id, name, and age, and you want to insert a new student with an ID of 1, a name of "John", and an age of 20, you would use the following INSERT statement:
+
+```
+INSERT INTO students (id, name, age) VALUES (1, 'John', 20);
+```
+
+If you want to insert multiple rows at once, you can use a comma-separated list of values sets enclosed in parentheses. For example, to insert two students into the students table, you can use the following INSERT statement:
+
+```
+INSERT INTO students (id, name, age) VALUES (1, 'John', 20), (2, 'Jane', 22);
+```
+
+Using the SET clause:
+```
+INSERT INTO students SET id= 3, name = 'Doe',age=23;
+```
+
+SELECTing from another table:
+```
+INSERT INTO contractor SELECT * FROM person WHERE status = 'c';
+```
+This INSERT INTO statement with a SELECT subquery in MariaDB allows you to copy data from one table to another based on a specific condition.
+In this case, the statement is selecting all columns (*) from the person table where the status column is equal to 'c', which stands for contractors. The SELECT statement acts as a filter to select only the rows that match the condition.
+Then, the selected rows are inserted into the contractor table using the INSERT INTO statement. The columns in the person table and the contractor table must match in number and data type for this to work correctly.
