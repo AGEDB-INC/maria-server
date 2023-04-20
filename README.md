@@ -1,6 +1,9 @@
-# Build and Debug from source (Ubuntu 22.04)
+# Build and Debug from source (Ubuntu 22.04) using cmake
+The maria-db is compiled using cmake.
 
 ## Install Dependencies
+
+Figuring configuration contents:
 Firstly Create configuration file in this path '/etc/apt/sources.list.d/mariadb.list` using following command:
 
 ```
@@ -234,3 +237,6 @@ git clean -xffd && git submodule foreach --recursive git clean -xffd
 ```
 
 Then, follow all the previous steps from the beginning.
+
+References:
+1. https://mariadb.com/kb/en/generic-build-instructions/
