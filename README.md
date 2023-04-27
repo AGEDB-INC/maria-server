@@ -238,6 +238,7 @@ git clean -xffd && git submodule foreach --recursive git clean -xffd
 
 Then, follow all the previous steps from the beginning.
 
+
 ## Install MariaDB on Windows
 
 There are few pre-requisite we need to install before even start building the server:
@@ -542,3 +543,37 @@ OQGraph uses recursive common table expressions (CTEs) to perform graph traversa
 
 ### Using OQGraph
 To use OQGraph, you first need to create tables to store your graph data. You can then specify the OQGRAPH engine for the table that will store the edges of the graph. Once your tables are set up, you can write SQL queries that use CTEs to traverse the graph and retrieve the desired data.
+
+# Implementing cypher UDF function
+
+Overall goal is to execute cypher query within SQL like this: `SELECT * FROM cypher(...);`.
+
+We need to find a way to implement the `cypher` UDF which returns a set of rows.
+
+## Function vs. Procedure vs. UDF
+
+Quick summary of the ways of creating functions\procedures in MariaDB.
+
+| Type             | Written in | Returns     |  Usage |Example |
+|------------------|------------|-------------|--------|-|
+| [Stored function](https://mariadb.com/kb/en/stored-functions/)   | SQL        | Single value                      | In any SQL statement      | `SELECT my_function();`|
+| [Stored procedure](https://mariadb.com/kb/en/stored-procedures/) | SQL        | Nothing                           | Only in CALL statement    | `CALL my_function();`  |
+| [UDF](https://mariadb.com/kb/en/user-defined-functions/)         | C\C++      | STRING, INTEGER, REAL or DECIMAL  | In any SQL statement      | `SELECT my_udf();`|
+
+## Idea 1
+
+MariaDB UDF functions currently support returning only 4 primitive types.
+
+So, we can implement `cypher` as a stored procedure. The proeduce will execute following tasks:
+
+1. It will call a helper UDF that returns JSON string containing number of columns and type of each column to be returned by the cypher query.
+2. It will create a temporary table based on the previous information.
+3. It will call the 'executor' UDF function and pass the temporary table. The UDF will put the result of cypher query into the temporary table.
+4. It will execute `SELECT * FROM temporary_table;`.
+
+## Idea 2
+
+We can work on the following MariaDB issue which is about implementing support for functions that can return set of rows. Once the implementation is merged into MariaDB repo, we can implement cypher UDF just like we did in Postgresql.
+
+<https://jira.mariadb.org/browse/MDEV-5199>.
+
