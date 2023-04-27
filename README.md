@@ -386,4 +386,144 @@ Innodb stores some percentage of most recently used pages from buffer pool at se
 * InnoDB reserves additional memory for buffers and control structures, so that the total allocated space is approximately 10% greater than the specified buffer pool size.
 
 * The size of each page in the Buffer Pool depends on the value of the **innodb_page_size** system variable.
-=======
+
+# JSON(JavaScript Object Notation)
+
+## JSON Introduction
+
+JSON stands for JavaScript object notation. It is a text format for storing and transporting data. It is an easy concept to learn.
+
+### Example
+
+Following is an example of how we write JSOn string:
+
+```
+'{"product":"Clothes", "id":"331134", "color":"Blue"}'
+```
+
+It defines an object with 3 properties:
+1. product
+2. id
+3. color
+
+Each property above has a value.
+You can access the data as an object, if you parse above string with a JavaScript program.
+
+```
+let product = obj.product
+let color = obj.color
+```
+
+## What is JSON? Why should we use it?
+
+JSON stands for JavaScript object notation. It is a lightweight data interchange format and is written in JavaScript object notation. It is also used for interchanging data between computers and is also language independent. JSON syntax is derived from JavaScript object notation but it is text only. COde for reading and generating Many programming languages provide utility of reading and generating JSON.
+
+JSON format and creating of JavaScript objects are syntactically identical and due to this, JavaScript programs can convert JSON data into JS objects. Since the format of JSON is text only, JSON data can easily be sent between computers and used by any programming language. JavaScript has some built in functions that converts JSON strings into JavaScript objects.
+
+```
+JSON.parse() and JSON.stringify()
+```
+
+JSON.parse is used for conversion of JSON strings into JavaScript objects and JSON.stringify is used for converting an object into a JSON string. You can send and receive a JavaScript object from the server in pure text.
+
+## JSON Syntax Rules
+
+The JSON syntax is a subset of JS syntax.
+
+### Syntax Rules
+
+Syntax of JSON is derived from JS object notation syntax:
+* Data is placed in key/value pairs
+  
+  The data is written in key value pairs and this pair consists of a name, followed by a colon and then followed by a value.
+* Data is separated by commas
+  
+  Data i.e. key value pairs are separated by commas to separate them.
+* Curly brackets to hold objects
+
+  Curly braces i.e. {} are used for storing objects in JSON.
+* a brackets to hold arrays
+
+  We use square brackets [] to store arrays in JSON
+  
+
+## JSON format
+
+JSON format requires key value pairs, i.e. the keys must be strings written inside double quotes. A key value pair consists of a name, followed by a colon, followed by a value.
+
+```plaintext
+## Example
+
+"Color" : "Blue"
+```
+
+In above example Color is the key and blue is the value of that key.
+
+## JSON Datatypes
+
+JSON has following datatypes:
+
+* String
+* Number
+* Object
+* Array
+* Boolean
+* Null
+
+JSON datatype cannot be any of the following:
+* function
+* date
+* undefined
+
+### String:
+String values should be enclosed in double quotes
+For example:
+
+```plaintext
+{"Name":"Talha"}
+```
+
+### Number:
+Digits in JSON can be any integer or floating point numbers.
+For example:
+
+```plaintext
+{"id":29871}
+```
+
+### Object:
+Values used in JSON can be objects as well:
+For example:
+
+```plaintext
+{
+    "Employee":
+        {"name":"Talha", "age":10, "id":1234}
+}
+```
+
+### Arrays:
+Values in JSON can be arrays as well.
+For example:
+
+```plaintext
+{
+"employees":["John", "Anna", "Peter"]
+}
+```
+
+### Booleans:
+Values in JSON can be true/false.
+For example:
+
+```plaintext
+{"Married":true}
+```
+
+### Null:
+Values in JSON can be Null as well.
+For example:
+
+```plaintext
+{"Date of birth": null}
+```
