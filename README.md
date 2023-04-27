@@ -1,6 +1,8 @@
-# Build and Debug from source (Ubuntu 22.04)
+# Build and Debug from source using cmake (Ubuntu 22.04)
 
 ## Install Dependencies
+
+Figuring configuration contents:
 Firstly Create configuration file in this path '/etc/apt/sources.list.d/mariadb.list` using following command:
 
 ```
@@ -36,7 +38,8 @@ sudo apt-get update
 
 ```
 
-
+## References:
+    1. https://mariadb.com/kb/en/generic-build-instructions/ 
 
 ## Build
 
@@ -235,7 +238,119 @@ git clean -xffd && git submodule foreach --recursive git clean -xffd
 
 Then, follow all the previous steps from the beginning.
 
-## RESEARCH
+## Install MariaDB on Windows
+
+There are few pre-requisite we need to install before even start building the server:
+
+### **Visual C++**
+
+Download and Install Visual C++ from [Microsoft](https://visualstudio.microsoft.com/). Community Version 2019 and 2022 are supported at this time.
+
+Make sure to select and install "Desktop Development with C++" during the installation process.
+
+
+![Visual Code Installation](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/574kwg6tz8xl994lqf96.png)
+
+
+### **CMake**
+
+Download CMake from [cmake-v3.26.0](https://github.com/Kitware/CMake/releases/download/v3.26.0/cmake-3.26.0-windows-x86_64.msi) and install on the machine. 
+
+- Minimum version required: 3.14 
+
+**Check out one of my blog on** [CMake installation](https://dev.to/arun3sh/install-cmake-on-windows-4eo5) 
+
+Make sure to add `C:\GnuWin32\bin` to your windows system path. 
+
+### **Git**
+
+Download and Install git using [Git-2.39.2-64-bit.exe](https://github.com/git-for-windows/git/releases/download/v2.39.2.windows.1/Git-2.39.2-64-bit.exe)
+
+**While installing git, make sure to select the PATH environment as follows:**
+![Git Installation](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/08hgxcmd6pcmbqroo4hs.png)
+
+### **Bison**
+
+Download the executable from the link:
+[Download Gnu Diff](https://ftp.gnu.org/gnu/diffutils/)
+
+Follow the steps to install the executable.
+
+## Build
+
+- Get the source code
+
+You will be able to find the source code of MariaDB from their GitHub repo [MariaDB Github Repository](https://github.com/MariaDB/server) 
+
+- Clone the repo to your system
+
+```bash
+git clone git@github.com:MariaDB/server.git 
+```
+
+After the clone is complete, you will have a complete copy of the repository in the server directory. You can then work on the code locally, commit changes, and push them back to the remote repository as needed.
+
+- Create Build directory
+
+```bash
+# create a directory with name "build-dir"
+mkdir build-dir
+
+# go into "build-dir"
+cd build-dir
+
+# Run the following commands in sequence
+
+cmake ../server
+
+# If you want to build with Debugging option
+# otherwise just omit  --config Debug
+cmake --build . --config Debug
+```
+Build will take a while to complete and make sure there are no errors while building.
+
+```bash
+# go to the directory
+cd ..\build-dir\mysql-test
+
+# Test your build
+perl mysql-test-run.pl --suite=main --parallel=auto
+
+```
+
+If all the tests came out as passed, we have installed the MariaDB perfectly on Windows machine.
+
+## Insert Command
+
+The INSERT statement is used in MariaDB to add new data into a table. The basic syntax of the INSERT statement is as follows:
+```
+INSERT INTO table_name (column1, column2, column3, ...) VALUES (value1, value2, value3, ...);
+```
+
+For example, if you have a table called students with columns id, name, and age, and you want to insert a new student with an ID of 1, a name of "John", and an age of 20, you would use the following INSERT statement:
+
+```
+INSERT INTO students (id, name, age) VALUES (1, 'John', 20);
+```
+
+If you want to insert multiple rows at once, you can use a comma-separated list of values sets enclosed in parentheses. For example, to insert two students into the students table, you can use the following INSERT statement:
+
+```
+INSERT INTO students (id, name, age) VALUES (1, 'John', 20), (2, 'Jane', 22);
+```
+
+Using the SET clause:
+```
+INSERT INTO students SET id= 3, name = 'Doe',age=23;
+```
+
+SELECTing from another table:
+```
+INSERT INTO contractor SELECT * FROM person WHERE status = 'c';
+```
+This INSERT INTO statement with a SELECT subquery in MariaDB allows you to copy data from one table to another based on a specific condition.
+In this case, the statement is selecting all columns (*) from the person table where the status column is equal to 'c', which stands for contractors. The SELECT statement acts as a filter to select only the rows that match the condition.
+Then, the selected rows are inserted into the contractor table using the INSERT INTO statement. The columns in the person table and the contractor table must match in number and data type for this to work correctly.
 
 ## Buffer Pool
 
@@ -271,3 +386,4 @@ Innodb stores some percentage of most recently used pages from buffer pool at se
 * InnoDB reserves additional memory for buffers and control structures, so that the total allocated space is approximately 10% greater than the specified buffer pool size.
 
 * The size of each page in the Buffer Pool depends on the value of the **innodb_page_size** system variable.
+=======
