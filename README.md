@@ -352,3 +352,38 @@ This INSERT INTO statement with a SELECT subquery in MariaDB allows you to copy 
 In this case, the statement is selecting all columns (*) from the person table where the status column is equal to 'c', which stands for contractors. The SELECT statement acts as a filter to select only the rows that match the condition.
 Then, the selected rows are inserted into the contractor table using the INSERT INTO statement. The columns in the person table and the contractor table must match in number and data type for this to work correctly.
 
+## Buffer Pool
+
+Buffer pool is an in-memory cache used for faster access to frequently accessed data. It stores data and indexes reducing disk I/O.
+
+### Working of Buffer Pool
+
+Buffer pool mechanism works on the the two sublist concepts the **new sublist** and the **old sublist** where every item when accessed first time gets on the top of old sublist and on being called while in the old sublist moves to the top of new sublist. By default **37%** of space is reserved for old-block. 
+
+The mechanism of moving tuples out of the new sublist and old sublist is same as both of them works on the LRU algorithm. Once the block moves from old sublist to the head of new sublist then all the previously present blocks in new sublist move one step below and if the new sublist reaches its capacity then the least recently used block from new sublist moves to the head of old sublist.
+
+### Size of Buffer Pool
+
+The size of the buffer pool is determined by **innodb_buffer_pool_size** system variable. The size of buffer pool should be adjusted per your needs to see the best performance. In order to configure the size of buffer pool set **innodb_buffer_pool_size** system variable, the InnoDB Buffer Pool should usually be between 50%-75% of the memory available.
+
+#### 2 ways to configure size of buffer pool
+
+1) The size of the InnoDB buffer pool can be changed dynamically by setting the innodb_buffer_pool_size system variable using the SET GLOBAL statement which requires SUPER privilege.
+
+2)Changing the size of buffer pool by setting **innodb_buffer_pool_size** system variable in configuration file. Ensure that your custom configuration file is read last by using the z- prefix in the file name so that changes made by you are not overwritten. 
+innodb_buffer_pool_size system variable in the configuration file.
+**innodb_buffer_pool_size** needs to be set in a group that will be read by MariaDB Server, such as [mariadb] or [server]. When set in a configuration file, the value supports units such as "M" (Megabyte), "G" (Gigabyte), etc. For this method server restart is needed to reflect the changes.
+
+### Saving And Restoring Buffer Pool State
+
+Innodb stores some percentage of most recently used pages from buffer pool at server shutdown and restores them at server restart. This is managed by **innodb_buffer_pool_dump_pct** configuration option which is used to reduce warmup period.
+**innodb_buffer_pool_dump_at_shutdown** and **innodb_buffer_pool_load_at_startup** system variables should be enabled to allow buffer pool dump at shutdown and restore at server restart.
+
+#### Some Important Points Related to Buffer Pool
+
+* Pages are evicted using a least recently used (LRU) algorithm.
+
+* InnoDB reserves additional memory for buffers and control structures, so that the total allocated space is approximately 10% greater than the specified buffer pool size.
+
+* The size of each page in the Buffer Pool depends on the value of the **innodb_page_size** system variable.
+=======
