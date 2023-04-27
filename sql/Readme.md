@@ -1,3 +1,81 @@
+
+## Boolean Literals
+* In MariaDB, FALSE is equivalent to 0 and TRUE is equivalent to 1.
+* These constants are not case-sensitive, so TRUE, True, and true all mean the same thing.
+* When used with the IS operator, TRUE and FALSE are not synonyms of 1 and 0. For example, the expression 10 IS TRUE would return 1, but the expression 10 = * TRUE would return 0 because 1 is not equal to 10.
+* The IS operator also accepts a third constant: UNKNOWN, which is always a synonym for NULL.
+* While TRUE and FALSE are reserved words in MariaDB, UNKNOWN is not.
+In general, it's important to be aware of these when working with Boolean expressions in MariaDB to avoid unexpected results.
+## Date and Time Literals
+#### How to use Date and Time literals in MariaDB
+MariaDB supports the standard SQL syntax and ODBC syntax for defining Date, Time, and DateTime literals. These literals are useful for inserting and updating date and time values in tables, and for comparing dates and times in queries.
+#### Date Literals
+A Date literal is a string that represents a date value in the format 'YYYY-MM-DD' or 'YY-MM-DD'. You can use any punctuation character as a delimiter, but all delimiters must consist of one character. Different delimiters can be used in the same string, and delimiters are optional. A date literal can also be an integer in the format 
+* YYYYMMDD or 
+* YYMMDD.
+For example, the following date literals are all valid and represent the same value:
+* '1994-01-01' 
+* '94/01/01' 
+* '1994-01/01' 
+* 19940101
+#### DateTime Literals
+A DateTime literal is a string that represents a date and time value in the format 'YYYY-MM-DD HH:MM:SS' or 'YY-MM-DD HH:MM:SS'. You can use any punctuation character as a delimiter for the date part and time part, but all delimiters must consist of one character. Different delimiters can be used in the same string, and delimiters are mandatory. The delimiter between the date part and time part can be a T or any sequence of space characters.
+A DateTime literal can also be an integer in the format 
+* YYYYMMDDHHMMSS
+* YYMMDDHHMMSS
+* YYYYMMDD 
+* YYMMDD. 
+In this case, all the time subparts must consist of two digits.
+For example, the following DateTime literals are all valid and represent the same value:
+* '1994-01-01T12:30:03' 
+* '1994/01/01\n\t 12+30+03'
+* '1994/01\01\n\t 12+30-03'
+#### Time Literals
+A Time literal is a string that represents a time value in the format 'D HH:MM:SS', 'HH:MM:SS, 'D HH:MM', 'HH:MM', 'D HH', or 'SS'. D is a value from 0 to 34 which represents days. The only allowed delimiter for Time literals is ':', and delimiters are mandatory except in the 'HHMMSS' format.
+A Time literal can also be an integer in the format HHMMSS, MMSS, or SS.
+For example, the following Time literals are all valid and represent the same value:
+* '09:05:00' 
+* '9:05:0' 
+* '9:5:0' 
+* '090500'
+#### Special Values
+MariaDB allows some special values for date and time literals, such as '0000-00-00' for Date, '00:00:00' for Time, and '0000-00-00 00:00:00' for DateTime. These values are only allowed if the SQL_MODE NO_ZERO_DATE flag is not set.
+If the ALLOW_INVALID_DATES flag is set, invalid dates such as '30th February' are allowed. Otherwise, if the NO_ZERO_DATE flag is set, an error is produced, and if not, a zero-date is returned.
+By understanding the syntax and format of Date and Time literals, you can efficiently work with date and time values in MariaDB.
+
+## Hexadecimal Literals
+
+Hexadecimal literals are a way to represent values using base-16 numbers, where each digit can range from 0 to 9 or from A to F. This notation can be used to represent characters as binary strings or to represent integers in a numeric context.
+
+In MariaDB, there are three ways to write hexadecimal literals:
+* x'value'
+* X'value' and
+* 0xvalue. 
+
+The first two are SQL standard syntaxes, while the last one is a MySQL/MariaDB extension. The first two syntaxes always behave as a string, while the last one behaves as a string or as a number depending on context. It's important to note that hexadecimal literals can't be decimal numbers.
+
+When used in a numeric context, hexadecimal literals are interpreted as integers. For example, the expression "0xF" represents the integer value 15. In a string context, they are interpreted as binary strings, where each pair of digits represents a character. For example, the expression "x'61'" represents the character 'a'.
+
+In some cases, there can be differences between MariaDB and MySQL when dealing with hexadecimal literals. For example, the expression "x'0a'+0" returns 0 in MariaDB and 10 in MySQL. This is because MariaDB treats hexadecimal literals in a string context, while MySQL treats them as numbers.
+Overall, hexadecimal literals are a useful notation for representing values in a compact and readable way, but it's important to be aware of their behavior in different contexts and between different database systems.
+
+## Identifier Qualifiers
+
+In SQL, identifiers are used to reference data structures such as databases, tables, or columns. Qualifiers are used to specify the context within which the final identifier is interpreted. Let's take a closer look at how identifier qualifiers work in SQL.
+* Qualifiers for Databases When referencing a database, only the database identifier needs to be specified. For example, "db_name" is a valid qualifier for a database. If no database is specified, the current database is assumed. However, if there is no default database and no database is specified, an error is issued.
+
+* Qualifiers for Objects within Databases For objects such as tables, views, functions, etc. that are contained within a database, the database identifier can be specified. If no database is specified, the current database is assumed. It's important to note that the database identifier is optional for objects within the current database.
+
+* Qualifiers for Column Names For column names, the table and the database are generally obvious from the context of the statement. However, it is possible to specify the table identifier or the database identifier plus the table identifier. For example, "db_name.tbl_name.col_name" is a fully-qualified identifier that specifies the database, table, and column names.
+
+* Quoting and Spacing All identifiers can be quoted individually using backticks (`) or other quote characters, if needed. Extra spacing, including new lines and tabs, is allowed between identifiers and qualifiers for readability.
+
+* Dot (.) as Separator If a qualifier is composed of more than one identifier, a dot (.) must be used as a separator. For example, "db_name.tbl_name" uses a dot as a separator between the database and table identifiers. It's important to use the dot as a separator for correct interpretation of qualifiers.
+
+* Dot (.) for Default Database In some cases, a table identifier may be prefixed with a dot (.) for ODBC compliance, but this has no practical effect on MariaDB. It is equivalent to just specifying the table name without the dot. For example, "tbl_name" is equivalent to ".tbl_name" or ".tbl_name".
+
+Understanding how identifier qualifiers work in SQL is crucial for correctly referencing databases, tables, and columns in SQL statements. By using the appropriate qualifiers and following the correct syntax, you can ensure accurate interpretation of identifiers in your SQL queries.
+
 ## Identifier Names: Understanding Rules and Conventions
 
 In database systems, identifiers such as databases, tables, columns, indexes, aliases, and views are used to define objects that make up a database schema. Identifiers have specific rules and conventions for naming to ensure they are unique and unambiguous. In this article, we will discuss the rules and conventions for naming identifiers in MariaDB, a popular open-source relational database management system.
@@ -41,3 +119,4 @@ For instance,
 	                SELECT 0b1000001+0 will return the integer value 65.
                     
 Binary literals are useful in situations where binary strings need to be represented explicitly in a query. They are particularly useful in conjunction with the BIT data type.
+
