@@ -1,6 +1,8 @@
-# Build and Debug from source (Ubuntu 22.04)
+# Build and Debug from source using cmake (Ubuntu 22.04)
 
 ## Install Dependencies
+
+Figuring configuration contents:
 Firstly Create configuration file in this path '/etc/apt/sources.list.d/mariadb.list` using following command:
 
 ```
@@ -36,7 +38,8 @@ sudo apt-get update
 
 ```
 
-
+## References:
+    1. https://mariadb.com/kb/en/generic-build-instructions/ 
 
 ## Build
 
