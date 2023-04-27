@@ -73,7 +73,12 @@ cmake --build ./ -j8
 
 Before proceeding, you should have mariadb installed without any error from cmake.
 
-Copy the following mariadb configuration into the file `~/.my.cnf`. Set the absolute path to your data and build directory in the `datadir` and `language` entry before saving:
+Copy the following mariadb configuration into the file `~/.my.cnf`. 
+Open this file using command 
+```
+sudo gedit ~/.my.cnf
+```
+Ans set the absolute path to your data directory and absolute path to your build directory in the `datadir` and `language` entry respectively:
 ```
 # Example MariadB config file.
 # You can copy this to one of:
