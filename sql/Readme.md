@@ -120,3 +120,26 @@ For instance,
                     
 Binary literals are useful in situations where binary strings need to be represented explicitly in a query. They are particularly useful in conjunction with the BIT data type.
 
+## Numeric Literals
+
+Numeric literals are a fundamental part of any programming language, including SQL. Numeric literals are used to represent numeric values, such as integers, decimals, and floating-point numbers. In this article, we will discuss the syntax of numeric literals in SQL and provide examples to illustrate their usage.
+Syntax of Numeric Literals Numeric literals in SQL are written as a sequence of digits from 0 to 9. The sign can precede the digits, but it is optional for positive numbers. The integer and decimal parts of a decimal number are separated by a dot (.). If the integer part is zero, it can be omitted, but the literal must begin with a dot. The following are some examples of decimal literals:
+* 10
+* +10
+* -10
+* 0.1
+* .1
+* +0.1
+* +.1
+
+In some cases, adding zeroes at the end of a decimal number can increment the precision of the expression where the number is used. For example, the PI() function by default returns a number with six decimal digits. However, the PI()+0.0000000000 expression (with ten zeroes) returns a number with ten decimal digits.
+In addition to decimal literals, SQL supports exponential notation for representing very large or very small numbers. The exponent is preceded by an E or e character. The exponent can be preceded by a sign and must be an integer. A number N with an exponent part X is calculated as N * POW(10, X). The following are some examples of exponential notation:
+* 0.2E3 -- 0.2 * POW(10, 3) = 200
+* .2e3
+* .2e+2
+* 1.1e-10 -- 0.00000000011
+* -1.1e10 -- -11000000000
+
+SQL also supports hexadecimal literals, which are interpreted as numbers when used in numeric contexts. Hexadecimal literals begin with a 0x prefix, followed by a sequence of hexadecimal digits. The following are some examples of hexadecimal literals:
+0x10 -- 16 in decimal
+0xFF -- 255 in decimal
