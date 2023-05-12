@@ -118,3 +118,32 @@ In SQL, identifiers are used to reference data structures such as databases, tab
 * Dot (.) for Default Database In some cases, a table identifier may be prefixed with a dot (.) for ODBC compliance, but this has no practical effect on MariaDB. It is equivalent to just specifying the table name without the dot. For example, "tbl_name" is equivalent to ".tbl_name" or ".tbl_name".
 
 Understanding how identifier qualifiers work in SQL is crucial for correctly referencing databases, tables, and columns in SQL statements. By using the appropriate qualifiers and following the correct syntax, you can ensure accurate interpretation of identifiers in your SQL queries.
+
+## Identifier to File Name Mapping
+
+When mapping SQL identifiers to file names on a filesystem, certain characters may not be allowed in file names, depending on the specific filesystem used. To address this issue, MariaDB uses a special character set to encode "potentially unsafe" characters in the identifier to derive the corresponding file name.
+The encoding process involves converting the identifier to the "filename" character set, which then produces the file name. Conversely, converting the file name from the "filename" character set back to the original character set produces the identifier.
+If the identifier only contains basic Latin letters, numbers, and underscores, the encoding matches the name. Otherwise, the identifier is encoded based on a table that maps Unicode character ranges to specific patterns. 
+
+For example, the Latin-1 Supplement and Latin Extended-A character ranges are encoded as [@][0..4][g..z], while the Greek and Coptic character range is encoded as [@][5..9][g..z].
+This encoding process happens transparently at the filesystem level, except for identifiers created before MySQL 5.1.6. For such identifiers, which have not been updated to the new encoding scheme, the server prefixes mysql50 to the identifier name.
+To find the file name for a table with a non-Latin1 name, you can use the following query:
+
+```
+SELECT CAST(CONVERT("this_is_таблица" USING filename) AS binary);
+```
+
+This will return the file name, which is "this_is_@y0@g0@h0@r0@o0@i1@g0".
+
+To find the table name for a given file name, you can use the following query:
+
+```
+SELECT CONVERT(_filename "this_is_@y0@g0@h0@r0@o0@i1@g0" USING utf8);
+```
+
+This will return the original table name, which is "this_is_таблица".
+For old identifiers created before MySQL 5.1.6, you need to supply the mysql50 prefix to reference the table. For example:
+SHOW COLUMNS FROM `#mysql50#table@1`;
+This will display the columns of the table named "table@1" that was created before MySQL 5.1.6.
+
+
