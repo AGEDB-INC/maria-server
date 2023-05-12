@@ -147,3 +147,29 @@ SHOW COLUMNS FROM `#mysql50#table@1`;
 This will display the columns of the table named "table@1" that was created before MySQL 5.1.6.
 
 
+## MariaDB Error Codes
+
+MariaDB shares many error codes with MySQL, it also has its own set of specific error codes. Understanding error codes is important for troubleshooting database issues, as it provides insight into what went wrong and how to fix it.
+#### Shared MariaDB/MySQL Error Codes 
+MariaDB and MySQL share error codes from 1000 to 1800. These codes include common errors such as syntax errors, connection errors, and permission errors. Here are some of the most common shared error codes:
+* Error Code 1045: Access denied for user 'user'@'host' (using password: YES) This error is caused when the user does not have sufficient permissions to access a specific database or table. It may also indicate an incorrect username or password.
+
+* Error Code 1064: You have an error in your SQL syntax This error is caused by a syntax error in an SQL statement. It could be a missing or extra character, a typo, or incorrect syntax.
+
+* Error Code 1146: Table 'database.table' doesn't exist This error is caused when a query is trying to access a non-existent table. It could be a typo in the table name or a missing CREATE TABLE statement.
+
+* Error Code 1364: Field 'field_name' doesn't have a default value This error is caused when a query is trying to insert a row into a table without specifying a value for a non-null field that does not have a default value.
+
+
+#### MariaDB-Specific Error Codes
+In addition to the shared error codes, MariaDB has its own set of specific error codes. These codes are numbered from 1900 and up. Some of the most common MariaDB-specific error codes include:
+
+* Error Code 1905: Lock wait timeout exceeded; try restarting transaction This error is caused when a transaction is waiting for a lock to be released, but the lock is held by another transaction for too long. It can be fixed by either increasing the lock wait timeout or by optimizing the queries to reduce the time needed to acquire the lock.
+
+* Error Code 1932: The used command is not allowed with this MariaDB version This error is caused when a command that is not supported by the current version of MariaDB is used. It could be an outdated query or a new feature that is not yet supported.
+
+* Error Code 2002: Can't connect to local MySQL server through socket '/var/lib/mysql/mysql.sock' (2) This error is caused when the MySQL server is not running or when the connection to the server is refused. It could also indicate an incorrect socket file path.
+
+* Error Code 2013: Lost connection to MySQL server during query This error is caused when the connection to the server is lost while a query is being executed. It could be caused by network issues, server overload, or a timeout.
+
+For detailed error codes refer : https://mariadb.com/kb/en/mariadb-error-codes/#shared-mariadbmysql-error-codes
