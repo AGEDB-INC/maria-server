@@ -529,6 +529,51 @@ For example:
 {"Date of birth": null}
 ```
 
+
+## JSON vs XML:
+Both the JSON and xml are used to receive data from web servers.
+
+The following JSON and XML examples both define an employees object, with an array of 3 employees.
+
+### JSON Example:
+```
+{"students":[
+  { "firstName":"Talha", "lastName":"Munir" },
+  { "firstName":"Salman", "lastName":"Ahmad" },
+  { "firstName":"Usman", "lastName":"Tahir" }
+]}
+```
+
+### XML Example:
+```
+<students>
+  <student>
+    <firstName>Talha</firstName> <lastName>Munir</lastName>
+  </student>
+  <student>
+    <firstName>Salman</firstName> <lastName>Ahmad</lastName>
+  </student>
+  <student>
+    <firstName>Usman</firstName> <lastName>Tahir</lastName>
+  </student>
+</students>
+```
+
+
+JSON and XML are almost both similar.
+* Both of them have self describing tags
+* Both are hierarchical contain values within values
+* Both can be parsed using different programming languages
+
+Despite that they both have differences as well.
+* JSON doesnot use end tags
+* JSON is quicker
+* JSON is shorter than XML
+* JSON can use arrays as well.
+
+JSON is parsed using a standard javascript function and xml is parsed using an xml parser.XML is difficult to parse than JSON. JSON is parsed using a JavaScript object. 
+
+
 ## RESEARCH for OQGraph
 
 ### What is OQGraph?
