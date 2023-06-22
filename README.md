@@ -529,6 +529,42 @@ For example:
 {"Date of birth": null}
 ```
 
+## Arrays in JSON
+As discussed above we can add arrays as a value in JSON. 
+The below example is a JSON string and inside the JSON string, there exists an array literal. 
+
+The JSON string:
+```
+'["John", "Anna", "Peter"]'
+```
+The array literal:
+```
+["John", "Anna", "Peter"]
+```
+Arrays in JSON and Javascript are almost similar. In JSON, array values should be from one of the following datatypes i.e. string, number, object, array, boolean or null. Whereas in JavaScript the array values can be all of the above mentioned datatypes, plus any other valid JavaScript expression, including functions, dates and undefined. 
+
+Following is an example of a Javascript array:
+```
+Names = ["John", "Anna", "Peter"];
+```
+You can also access the array values using the index of the array. For example if you write Names[1] it will return "Anna".
+
+You can also loop through an array using a for loop. Below is a sample example to do that:
+
+```
+const json = '{"product":"Clothes", "id":"331134", "color":["Blue", "Yellow", "Violet"]}';
+const objects = JSON.parse(json);
+
+let extractedText = "";
+for (let i in objects.color) {
+  extractedText += objects.color[i] + ", ";
+}
+
+document.getElementById("demo").innerHTML = extractedText;
+```
+The above code script will be enclosed in script tag to make sure it executes smoothly. The code first declares a JSON structure that we have also used previously. Then we convert the JSON structure into a Javascript object using json.parse() method. Then we use a for loop to go through the objects and store them into a separate variable iteratively. After the iteration is completed we will display the extracted text.
+
+
 ## RESEARCH for OQGraph
 
 ### What is OQGraph?
